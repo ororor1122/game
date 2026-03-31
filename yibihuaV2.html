@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>一笔画 · 十关挑战</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #1a3c2c 0%, #0e2a1f 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, 'Roboto', sans-serif;
+            touch-action: pan-y;
+            padding: 16px;
+        }
+
+        .game-container {
+            background: rgba(255,248,225,0.9);
+            border-radius: 56px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,200,0.6);
+            padding: 20px 16px 24px;
+            width: 100%;
+            max-width: 550px;
+            transition: all 0.2s ease;
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        h1 {
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #3b5e2b, #1e3a1a);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            font-weight: 800;
+        }
+        .level-badge {
+            background: #2d3e2b;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 5px 20px;
+            border-radius: 60px;
+            margin-top: 6px;
+            color: #ffefb9;
+            font-weight: bold;
+        }
+        .level-badge span {
+            font-size: 1.3rem;
+            color: #f9c35c;
+        }
+
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            margin: 8px 0 12px;
+        }
+        canvas {
+            background: #fef7e0;
+            border-radius: 48px;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.3), inset 0 0 0 2px rgba(255,245,190,0.8);
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            background: #e7dbbd;
+            padding: 10px 20px;
+            border-radius: 60px;
+            margin: 12px 8px 18px;
+            box-shadow: inset 0 1px 4px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .edges-counter {
+            background: #2d3e2b;
+            padding: 5px 16px;
+            border-radius: 40px;
+            color: #ffefb9;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        .edges-counter span {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #f9c35c;
+            margin-right: 4px;
+        }
+        .message {
+            background: #5f4c2b;
+            color: #fae672;
+            padding: 5px 18px;
+            border-radius: 32px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-align: center;
+            flex: 1;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 8px 0;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            font-weight: bold;
+            font-size: 1rem;
+            padding: 10px 20px;
+            border-radius: 48px;
+            background: #fff0cf;
+            color: #2b4a1e;
+            box-shadow: 0 4px 0 #ad9e7a;
+            transition: 0.07s linear;
+            cursor: pointer;
+            touch-action: manipulation;
+            font-family: inherit;
+            letter-spacing: 1px;
+            min-width: 90px;
+        }
+        .btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #ad9e7a;
+        }
+        .btn-level {
+            background: #ffda9e;
+            color: #8b5a2b;
+        }
+        .btn-reset {
+            background: #e2c294;
+        }
+        .btn-hint {
+            background: #bfd8b8;
+        }
+        footer {
+            text-align: center;
+            font-size: 0.6rem;
+            color: #5c533b;
+            margin-top: 16px;
+            opacity: 0.7;
+        }
+
+        @media (max-width: 480px) {
+            .game-container { padding: 14px 12px 18px; }
+            .btn { padding: 8px 14px; font-size: 0.9rem; min-width: 75px; }
+            .info-panel { padding: 6px 12px; }
+            .edges-counter { font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="game-header">
+        <h1>✍️ 一笔画 · 十关 ✍️</h1>
+        <div class="level-badge">
+            📍 第 <span id="levelIndex">1</span> / <span id="totalLevels">10</span> 关
+        </div>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+    </div>
+
+    <div class="info-panel">
+        <div class="edges-counter">
+            <span id="remainingEdges">0</span> / <span id="totalEdges">0</span> 边
+        </div>
+        <div class="message" id="statusMsg">
+            👆 触摸节点开始
+        </div>
+    </div>
+
+    <div class="button-group">
+        <button class="btn btn-level" id="prevBtn">◀ 上一关</button>
+        <button class="btn btn-reset" id="resetBtn">🔄 重置</button>
+        <button class="btn btn-hint" id="hintBtn">💡 提示</button>
+        <button class="btn btn-level" id="nextBtn">下一关 ▶</button>
+    </div>
+    <footer>一笔连完所有线段 | 滑动连接相邻点 | 难度递增</footer>
+</div>
+
+<script>
+    (function(){
+        // ---------- 关卡数据 (难度由简到繁，保证一笔画可行) ----------
+        const LEVELS = [];
+
+        // 辅助函数：为每个关卡生成唯一id
+        function defLevel(levelId, nodesArr, edgesArr) {
+            return { id: levelId, nodes: nodesArr, edges: edgesArr };
+        }
+
+        // 关卡1: 三角形 (3节点, 3边) 奇点0? 三个点都是偶点(2度) -> 欧拉回路
+        LEVELS.push(defLevel(1, [
+            { id: 'A', label: '▲', xRatio: 0.5, yRatio: 0.25 },
+            { id: 'B', label: '◀', xRatio: 0.25, yRatio: 0.75 },
+            { id: 'C', label: '▶', xRatio: 0.75, yRatio: 0.75 }
+        ], [
+            { id: 'AB', from: 'A', to: 'B' }, { id: 'BC', from: 'B', to: 'C' }, { id: 'CA', from: 'C', to: 'A' }
+        ]));
+
+        // 关卡2: 正方形 (4节点, 4边)
+        LEVELS.push(defLevel(2, [
+            { id: 'NW', label: '◽', xRatio: 0.25, yRatio: 0.3 },
+            { id: 'NE', label: '◽', xRatio: 0.75, yRatio: 0.3 },
+            { id: 'SE', label: '◽', xRatio: 0.75, yRatio: 0.7 },
+            { id: 'SW', label: '◽', xRatio: 0.25, yRatio: 0.7 }
+        ], [
+            { id: 'top', from: 'NW', to: 'NE' }, { id: 'right', from: 'NE', to: 'SE' },
+            { id: 'bottom', from: 'SE', to: 'SW' }, { id: 'left', from: 'SW', to: 'NW' }
+        ]));
+
+        // 关卡3: 正方形加一条对角线 (4节点, 5边) 两个奇点(对角端点) -> 欧拉路径
+        LEVELS.push(defLevel(3, [
+            { id: 'NW', label: '◻', xRatio: 0.25, yRatio: 0.3 },
+            { id: 'NE', label: '◻', xRatio: 0.75, yRatio: 0.3 },
+            { id: 'SE', label: '◻', xRatio: 0.75, yRatio: 0.7 },
+            { id: 'SW', label: '◻', xRatio: 0.25, yRatio: 0.7 }
+        ], [
+            { id: 'top', from: 'NW', to: 'NE' }, { id: 'right', from: 'NE', to: 'SE' },
+            { id: 'bottom', from: 'SE', to: 'SW' }, { id: 'left', from: 'SW', to: 'NW' },
+            { id: 'diag', from: 'NW', to: 'SE' }
+        ]));
+
+        // 关卡4: 五边形 (5节点, 5边)
+        LEVELS.push(defLevel(4, [
+            { id: 'P0', label: '★', xRatio: 0.5, yRatio: 0.2 },
+            { id: 'P1', label: '◆', xRatio: 0.2, yRatio: 0.4 },
+            { id: 'P2', label: '◆', xRatio: 0.35, yRatio: 0.75 },
+            { id: 'P3', label: '◆', xRatio: 0.65, yRatio: 0.75 },
+            { id: 'P4', label: '◆', xRatio: 0.8, yRatio: 0.4 }
+        ], [
+            { id: 'e0', from: 'P0', to: 'P1' }, { id: 'e1', from: 'P1', to: 'P2' },
+            { id: 'e2', from: 'P2', to: 'P3' }, { id: 'e3', from: 'P3', to: 'P4' },
+            { id: 'e4', from: 'P4', to: 'P0' }
+        ]));
+
+        // 关卡5: 五角星 (5节点, 5边) 星形交叉边 -> 实际五角星需要内部连线，但简化为星形外圈一笔画
+        // 这里做一个简单“星形”内接五边形跳线，保证奇点2个
+        LEVELS.push(defLevel(5, [
+            { id: 'T', label: '⭐', xRatio: 0.5, yRatio: 0.2 },
+            { id: 'L', label: '⭐', xRatio: 0.2, yRatio: 0.6 },
+            { id: 'B', label: '⭐', xRatio: 0.5, yRatio: 0.85 },
+            { id: 'R', label: '⭐', xRatio: 0.8, yRatio: 0.6 },
+            { id: 'M', label: '✨', xRatio: 0.5, yRatio: 0.5 }
+        ], [
+            { id: 'TL', from: 'T', to: 'L' }, { id: 'LB', from: 'L', to: 'B' },
+            { id: 'BR', from: 'B', to: 'R' }, { id: 'RT', from: 'R', to: 'T' },
+            { id: 'TM', from: 'T', to: 'M' }, { id: 'BM', from: 'B', to: 'M' },
+            { id: 'LM', from: 'L', to: 'M' }, { id: 'RM', from: 'R', to: 'M' }
+        ])); // 8条边，难度提高
+
+        // 关卡6: 十字形 (5节点, 6边)
+        LEVELS.push(defLevel(6, [
+            { id: 'C', label: '➕', xRatio: 0.5, yRatio: 0.5 },
+            { id: 'U', label: '↑', xRatio: 0.5, yRatio: 0.25 },
+            { id: 'D', label: '↓', xRatio: 0.5, yRatio: 0.75 },
+            { id: 'L', label: '←', xRatio: 0.25, yRatio: 0.5 },
+            { id: 'R', label: '→', xRatio: 0.75, yRatio: 0.5 }
+        ], [
+            { id: 'CU', from: 'C', to: 'U' }, { id: 'CD', from: 'C', to: 'D' },
+            { id: 'CL', from: 'C', to: 'L' }, { id: 'CR', from: 'C', to: 'R' },
+            { id: 'LR', from: 'L', to: 'R' },  // 增加横向连接，更复杂
+            { id: 'UD', from: 'U', to: 'D' }
+        ]));
+
+        // 关卡7: 矩形+对角线+中心点 (6节点, 8边)
+        LEVELS.push(defLevel(7, [
+            { id: 'NW', label: '□', xRatio: 0.2, yRatio: 0.25 },
+            { id: 'NE', label: '□', xRatio: 0.8, yRatio: 0.25 },
+            { id: 'SE', label: '□', xRatio: 0.8, yRatio: 0.75 },
+            { id: 'SW', label: '□', xRatio: 0.2, yRatio: 0.75 },
+            { id: 'M', label: '●', xRatio: 0.5, yRatio: 0.5 }
+        ], [
+            { id: 'top', from: 'NW', to: 'NE' }, { id: 'right', from: 'NE', to: 'SE' },
+            { id: 'bottom', from: 'SE', to: 'SW' }, { id: 'left', from: 'SW', to: 'NW' },
+            { id: 'diag1', from: 'NW', to: 'SE' }, { id: 'diag2', from: 'NE', to: 'SW' },
+            { id: 'M-NW', from: 'M', to: 'NW' }, { id: 'M-SE', from: 'M', to: 'SE' }
+        ]));
+
+        // 关卡8: 六边形 (6节点, 6边)
+        LEVELS.push(defLevel(8, [
+            { id: 'A', label: '⬤', xRatio: 0.5, yRatio: 0.2 },
+            { id: 'B', label: '⬤', xRatio: 0.2, yRatio: 0.4 },
+            { id: 'C', label: '⬤', xRatio: 0.2, yRatio: 0.7 },
+            { id: 'D', label: '⬤', xRatio: 0.5, yRatio: 0.85 },
+            { id: 'E', label: '⬤', xRatio: 0.8, yRatio: 0.7 },
+            { id: 'F', label: '⬤', xRatio: 0.8, yRatio: 0.4 }
+        ], [
+            { id: 'AB', from: 'A', to: 'B' }, { id: 'BC', from: 'B', to: 'C' },
+            { id: 'CD', from: 'C', to: 'D' }, { id: 'DE', from: 'D', to: 'E' },
+            { id: 'EF', from: 'E', to: 'F' }, { id: 'FA', from: 'F', to: 'A' }
+        ]));
+
+        // 关卡9: 复杂网格 (8节点, 12边) 类似H形+斜线
+        LEVELS.push(defLevel(9, [
+            { id: '1', label: '①', xRatio: 0.2, yRatio: 0.3 },
+            { id: '2', label: '②', xRatio: 0.5, yRatio: 0.2 },
+            { id: '3', label: '③', xRatio: 0.8, yRatio: 0.3 },
+            { id: '4', label: '④', xRatio: 0.2, yRatio: 0.7 },
+            { id: '5', label: '⑤', xRatio: 0.5, yRatio: 0.8 },
+            { id: '6', label: '⑥', xRatio: 0.8, yRatio: 0.7 },
+            { id: '7', label: '⑦', xRatio: 0.5, yRatio: 0.5 }
+        ], [
+            { id: '12', from: '1', to: '2' }, { id: '23', from: '2', to: '3' },
+            { id: '14', from: '1', to: '4' }, { id: '25', from: '2', to: '5' },
+            { id: '36', from: '3', to: '6' }, { id: '45', from: '4', to: '5' },
+            { id: '56', from: '5', to: '6' }, { id: '17', from: '1', to: '7' },
+            { id: '37', from: '3', to: '7' }, { id: '47', from: '4', to: '7' },
+            { id: '67', from: '6', to: '7' }, { id: '57', from: '5', to: '7' }
+        ]));
+
+        // 关卡10: 高难度星形+中心辐射 (9节点, 16边) 需要巧妙规划
+        LEVELS.push(defLevel(10, [
+            { id: 'A', label: '🌟', xRatio: 0.5, yRatio: 0.15 },
+            { id: 'B', label: '🌟', xRatio: 0.2, yRatio: 0.3 },
+            { id: 'C', label: '🌟', xRatio: 0.3, yRatio: 0.6 },
+            { id: 'D', label: '🌟', xRatio: 0.5, yRatio: 0.8 },
+            { id: 'E', label: '🌟', xRatio: 0.7, yRatio: 0.6 },
+            { id: 'F', label: '🌟', xRatio: 0.8, yRatio: 0.3 },
+            { id: 'G', label: '✨', xRatio: 0.5, yRatio: 0.45 },
+            { id: 'H', label: '✨', xRatio: 0.35, yRatio: 0.45 },
+            { id: 'I', label: '✨', xRatio: 0.65, yRatio: 0.45 }
+        ], [
+            { id: 'AB', from: 'A', to: 'B' }, { id: 'AF', from: 'A', to: 'F' },
+            { id: 'BC', from: 'B', to: 'C' }, { id: 'CD', from: 'C', to: 'D' },
+            { id: 'DE', from: 'D', to: 'E' }, { id: 'EF', from: 'E', to: 'F' },
+            { id: 'AG', from: 'A', to: 'G' }, { id: 'BG', from: 'B', to: 'G' },
+            { id: 'CG', from: 'C', to: 'G' }, { id: 'DG', from: 'D', to: 'G' },
+            { id: 'EG', from: 'E', to: 'G' }, { id: 'FG', from: 'F', to: 'G' },
+            { id: 'GH', from: 'G', to: 'H' }, { id: 'GI', from: 'G', to: 'I' },
+            { id: 'BH', from: 'B', to: 'H' }, { id: 'EI', from: 'E', to: 'I' }
+        ]));
+
+        const TOTAL_LEVELS = LEVELS.length;
+        document.getElementById('totalLevels').innerText = TOTAL_LEVELS;
+
+        // ---------- 全局变量 ----------
+        let currentLevelIdx = 0;          // 0-based
+        let currentLevelData = null;
+        let nodes = [];           // 当前关卡节点
+        let edgesDef = [];        // 当前关卡边
+        let usedEdges = [];
+        let currentNodeId = null;
+        let gameCompleted = false;
+        
+        let edgeMap = new Map();   // 边映射
+        let TOTAL_EDGES = 0;
+
+        // canvas相关
+        const canvas = document.getElementById('gameCanvas');
+        let ctx = canvas.getContext('2d');
+        let canvasWidth = 500, canvasHeight = 500;
+        let nodePositions = new Map();
+
+        // UI 元素
+        const remainingSpan = document.getElementById('remainingEdges');
+        const totalEdgesSpan = document.getElementById('totalEdges');
+        const statusDiv = document.getElementById('statusMsg');
+        const levelIndexSpan = document.getElementById('levelIndex');
+
+        // 触摸交互变量
+        let touchStartNode = null;
+        let isDragging = false;
+        let lastConnectedEdgeKey = '';
+
+        // ---------- 辅助函数 ----------
+        function rebuildEdgeMap() {
+            edgeMap.clear();
+            edgesDef.forEach((edge, idx) => {
+                const key1 = `${edge.from}-${edge.to}`;
+                const key2 = `${edge.to}-${edge.from}`;
+                edgeMap.set(key1, idx);
+                edgeMap.set(key2, idx);
+            });
+        }
+
+        function initLevel(levelData) {
+            nodes = levelData.nodes;
+            edgesDef = levelData.edges;
+            TOTAL_EDGES = edgesDef.length;
+            usedEdges = new Array(TOTAL_EDGES).fill(false);
+            currentNodeId = null;
+            gameCompleted = false;
+            rebuildEdgeMap();
+            updateUI();
+            updateNodePositions();
+            drawCanvas();
+            totalEdgesSpan.innerText = TOTAL_EDGES;
+        }
+
+        function loadLevel(index) {
+            currentLevelIdx = Math.min(Math.max(0, index), TOTAL_LEVELS - 1);
+            currentLevelData = LEVELS[currentLevelIdx];
+            initLevel(currentLevelData);
+            levelIndexSpan.innerText = currentLevelIdx + 1;
+            // 重置触摸状态
+            touchStartNode = null;
+            isDragging = false;
+            lastConnectedEdgeKey = '';
+        }
+
+        function updateUI() {
+            const usedCount = usedEdges.filter(v => v === true).length;
+            const left = TOTAL_EDGES - usedCount;
+            remainingSpan.innerText = left;
+            if (gameCompleted) {
+                statusDiv.innerHTML = '🎉 完美通关！ 🎉 继续下一关吧';
+                statusDiv.style.background = '#c7b15e';
+                statusDiv.style.color = '#2a431d';
+            } else {
+                if (currentNodeId === null) {
+                    statusDiv.innerHTML = '👆 触摸任意节点 开始一笔画';
+                } else {
+                    const nodeLabel = nodes.find(n => n.id === currentNodeId)?.label || '';
+                    statusDiv.innerHTML = `✍️ 当前在 ${nodeLabel}  | 剩余 ${left} 条边`;
+                }
+                statusDiv.style.background = '#5f4c2b';
+                statusDiv.style.color = '#fae672';
+            }
+        }
+
+        function checkCompletion() {
+            const allUsed = usedEdges.every(v => v === true);
+            if (allUsed && TOTAL_EDGES > 0 && !gameCompleted) {
+                gameCompleted = true;
+                updateUI();
+                drawCanvas();
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(200);
+                }
+            } else if (!allUsed && gameCompleted) {
+                gameCompleted = false;
+                updateUI();
+                drawCanvas();
+            } else {
+                updateUI();
+            }
+        }
+
+        function resetGame() {
+            usedEdges.fill(false);
+            currentNodeId = null;
+            gameCompleted = false;
+            lastConnectedEdgeKey = '';
+            touchStartNode = null;
+            updateUI();
+            drawCanvas();
+        }
+
+        function tryConnect(fromId, toId) {
+            if (gameCompleted) {
+                statusDiv.innerHTML = '🏆 本关已完成！点重置或换关 🏆';
+                return false;
+            }
+            if (!fromId || !toId || fromId === toId) return false;
+            const key1 = `${fromId}-${toId}`;
+            const key2 = `${toId}-${fromId}`;
+            let edgeIndex = -1;
+            if (edgeMap.has(key1)) edgeIndex = edgeMap.get(key1);
+            else if (edgeMap.has(key2)) edgeIndex = edgeMap.get(key2);
+            if (edgeIndex === -1) return false;
+            if (usedEdges[edgeIndex]) return false;
+
+            if (currentNodeId === null) {
+                currentNodeId = fromId;
+                return performConnection(fromId, toId, edgeIndex);
+            } else {
+                if (currentNodeId === fromId) {
+                    return performConnection(fromId, toId, edgeIndex);
+                } else if (currentNodeId === toId) {
+                    return performConnection(toId, fromId, edgeIndex);
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        function performConnection(aId, bId, eIdx) {
+            if (usedEdges[eIdx]) return false;
+            usedEdges[eIdx] = true;
+            currentNodeId = bId;
+            drawCanvas();
+            checkCompletion();
+            if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(30);
+            return true;
+        }
+
+        // 绘图
+        function updateNodePositions() {
+            nodePositions.clear();
+            for (let node of nodes) {
+                const x = node.xRatio * canvasWidth;
+                const y = node.yRatio * canvasHeight;
+                nodePositions.set(node.id, { x, y, label: node.label });
+            }
+        }
+
+        function drawCanvas() {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            // 背景网格
+            ctx.save();
+            ctx.strokeStyle = "#ddd0ae";
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvasWidth; i += 40) {
+                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvasHeight); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvasWidth,i); ctx.stroke();
+            }
+            // 绘制边
+            for (let idx = 0; idx < edgesDef.length; idx++) {
+                const edge = edgesDef[idx];
+                const fromPos = nodePositions.get(edge.from);
+                const toPos = nodePositions.get(edge.to);
+                if (!fromPos || !toPos) continue;
+                ctx.beginPath();
+                ctx.moveTo(fromPos.x, fromPos.y);
+                ctx.lineTo(toPos.x, toPos.y);
+                if (usedEdges[idx]) {
+                    ctx.strokeStyle = "#e5b83c";
+                    ctx.lineWidth = 6;
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = "#ffcd6b";
+                } else {
+                    ctx.strokeStyle = "#ac9a6e";
+                    ctx.lineWidth = 3.5;
+                    ctx.setLineDash([8, 6]);
+                    ctx.shadowBlur = 0;
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            ctx.shadowBlur = 0;
+            // 节点
+            for (let node of nodes) {
+                const pos = nodePositions.get(node.id);
+                if (!pos) continue;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 18, 0, Math.PI*2);
+                ctx.fillStyle = "#fdf8ed";
+                ctx.shadowBlur = 4;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 14, 0, Math.PI*2);
+                let grad = ctx.createRadialGradient(pos.x-4, pos.y-4, 5, pos.x, pos.y, 18);
+                grad.addColorStop(0, '#ffe2a4');
+                grad.addColorStop(1, '#e0b070');
+                ctx.fillStyle = grad;
+                ctx.fill();
+                if (currentNodeId === node.id && !gameCompleted) {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 24, 0, Math.PI*2);
+                    ctx.strokeStyle = "#ffb347";
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 8;
+                    ctx.stroke();
+                }
+                ctx.font = `bold ${Math.floor(canvasWidth * 0.045)}px "Segoe UI Emoji"`;
+                ctx.fillStyle = "#5a3e1f";
+                ctx.fillText(node.label, pos.x-11, pos.y+9);
+            }
+            if (gameCompleted) {
+                ctx.font = `bold ${Math.floor(canvasWidth * 0.07)}px system-ui`;
+                ctx.fillStyle = "#d4af37";
+                ctx.shadowBlur = 8;
+                ctx.fillText("★", canvasWidth-45, 55);
+                ctx.fillText("✓", 25, 65);
+                ctx.font = `bold ${Math.floor(canvasWidth * 0.045)}px system-ui`;
+                ctx.fillStyle = "#c4912b";
+                ctx.fillText("通关!", canvasWidth/2-35, 45);
+                ctx.shadowBlur = 0;
+            }
+            ctx.restore();
+        }
+
+        // 触摸事件
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvasWidth / rect.width;
+            const scaleY = canvasHeight / rect.height;
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            let canvasX = (clientX - rect.left) * scaleX;
+            let canvasY = (clientY - rect.top) * scaleY;
+            return { x: Math.min(Math.max(0, canvasX), canvasWidth), y: Math.min(Math.max(0, canvasY), canvasHeight) };
+        }
+
+        function findNearestNode(touchX, touchY) {
+            let minDist = 42;
+            let nearest = null;
+            for (let node of nodes) {
+                const pos = nodePositions.get(node.id);
+                if (!pos) continue;
+                const dx = pos.x - touchX, dy = pos.y - touchY;
+                const dist = Math.hypot(dx, dy);
+                if (dist < minDist) { minDist = dist; nearest = node.id; }
+            }
+            return nearest;
+        }
+
+        function onTouchStart(e) {
+            e.preventDefault();
+            if (gameCompleted) return;
+            const { x, y } = getCanvasCoords(e);
+            const nodeId = findNearestNode(x, y);
+            if (!nodeId) return;
+            touchStartNode = nodeId;
+            isDragging = true;
+            lastConnectedEdgeKey = '';
+            if (currentNodeId === null) {
+                currentNodeId = nodeId;
+                drawCanvas();
+                updateUI();
+            }
+        }
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (!isDragging || gameCompleted) return;
+            const { x, y } = getCanvasCoords(e);
+            const targetNode = findNearestNode(x, y);
+            if (!targetNode) return;
+            let fromNode = currentNodeId;
+            if (fromNode === null && touchStartNode) fromNode = touchStartNode;
+            if (!fromNode || targetNode === fromNode) return;
+            const edgeKey = `${fromNode}-${targetNode}`;
+            if (lastConnectedEdgeKey === edgeKey) return;
+            if (tryConnect(fromNode, targetNode)) {
+                lastConnectedEdgeKey = edgeKey;
+                touchStartNode = currentNodeId;
+            } else {
+                if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(20);
+                ctx.save();
+                ctx.fillStyle = "rgba(200,70,50,0.25)";
+                ctx.fillRect(0,0,canvasWidth,canvasHeight);
+                setTimeout(() => drawCanvas(), 70);
+            }
+        }
+        function onTouchEnd(e) {
+            e.preventDefault();
+            isDragging = false;
+            touchStartNode = null;
+            drawCanvas();
+        }
+
+        function giveHint() {
+            if (gameCompleted) { statusDiv.innerHTML = '🎯 已完成！重置或下一关'; return; }
+            let hintEdgeIdx = -1, hintFrom = null, hintTo = null;
+            if (currentNodeId !== null) {
+                for (let i = 0; i < edgesDef.length; i++) {
+                    if (usedEdges[i]) continue;
+                    const e = edgesDef[i];
+                    if (e.from === currentNodeId || e.to === currentNodeId) {
+                        hintEdgeIdx = i;
+                        hintFrom = currentNodeId;
+                        hintTo = (e.from === currentNodeId) ? e.to : e.from;
+                        break;
+                    }
+                }
+            }
+            if (hintEdgeIdx === -1) {
+                for (let i = 0; i < edgesDef.length; i++) {
+                    if (!usedEdges[i]) {
+                        hintEdgeIdx = i;
+                        hintFrom = edgesDef[i].from;
+                        hintTo = edgesDef[i].to;
+                        break;
+                    }
+                }
+            }
+            if (hintEdgeIdx === -1) { statusDiv.innerHTML = '✨ 所有边已走完 ✨'; return; }
+            const fromPos = nodePositions.get(hintFrom);
+            const toPos = nodePositions.get(hintTo);
+            if (fromPos && toPos) {
+                drawCanvas();
+                ctx.save();
+                ctx.beginPath(); ctx.arc(fromPos.x, fromPos.y, 28, 0, Math.PI*2); ctx.fillStyle = "#ffcc66aa"; ctx.fill();
+                ctx.beginPath(); ctx.arc(toPos.x, toPos.y, 28, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(fromPos.x, fromPos.y); ctx.lineTo(toPos.x, toPos.y);
+                ctx.strokeStyle = "#ffaa33"; ctx.lineWidth = 5; ctx.setLineDash([12,10]); ctx.stroke();
+                ctx.restore();
+                statusDiv.innerHTML = `💡 试试连接 ${hintFrom} → ${hintTo}`;
+                setTimeout(() => drawCanvas(), 900);
+            } else drawCanvas();
+        }
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const maxWidth = Math.min(container.clientWidth, window.innerWidth - 40);
+            canvas.style.width = `${maxWidth}px`;
+            canvas.style.height = `${maxWidth}px`;
+            canvas.width = maxWidth;
+            canvas.height = maxWidth;
+            canvasWidth = maxWidth;
+            canvasHeight = maxWidth;
+            updateNodePositions();
+            drawCanvas();
+        }
+
+        // 关卡切换
+        function nextLevel() {
+            if (currentLevelIdx + 1 < TOTAL_LEVELS) {
+                loadLevel(currentLevelIdx + 1);
+            } else {
+                statusDiv.innerHTML = '🎉 恭喜通关全部关卡！ 🎉';
+                setTimeout(() => { if(currentLevelIdx===TOTAL_LEVELS-1) statusDiv.innerHTML='👆 触摸节点开始'; }, 1500);
+            }
+        }
+        function prevLevel() {
+            if (currentLevelIdx > 0) loadLevel(currentLevelIdx - 1);
+            else statusDiv.innerHTML = '🏁 已是第一关';
+        }
+
+        // 事件绑定
+        function bindEvents() {
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd);
+            canvas.addEventListener('touchcancel', onTouchEnd);
+            document.getElementById('resetBtn').addEventListener('click', () => { resetGame(); drawCanvas(); });
+            document.getElementById('hintBtn').addEventListener('click', giveHint);
+            document.getElementById('nextBtn').addEventListener('click', nextLevel);
+            document.getElementById('prevBtn').addEventListener('click', prevLevel);
+            window.addEventListener('resize', () => resizeCanvas());
+            window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 30));
+        }
+
+        // 启动
+        function init() {
+            bindEvents();
+            resizeCanvas();
+            loadLevel(0); // 第1关
+        }
+        init();
+    })();
+</script>
+</body>
+</html>
