@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>经典大富翁 - 地产大亨</title>
+    <style>
+        * {
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(145deg, #1a472a 0%, #0e2a1a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* 游戏主容器 */
+        .game-container {
+            background: #2c1a0c;
+            border-radius: 48px;
+            padding: 20px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.1);
+        }
+
+        .game-wrapper {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* 棋盘画布 */
+        .board-area {
+            background: #f5e7d3;
+            border-radius: 28px;
+            padding: 12px;
+            box-shadow: inset 0 0 0 2px #fffaec, 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            background-color: #fdf8ed;
+            cursor: pointer;
+        }
+
+        /* 右侧信息面板 */
+        .info-panel {
+            width: 320px;
+            background: #fef7e0;
+            border-radius: 32px;
+            padding: 18px 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            backdrop-filter: blur(2px);
+            border: 1px solid #ffecb3;
+        }
+
+        .turn-indicator {
+            background: #3c2a1f;
+            color: #ffd966;
+            padding: 12px;
+            border-radius: 60px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            box-shadow: inset 0 1px 3px #5e3e28, 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .players-list {
+            background: #e9dbc9;
+            border-radius: 24px;
+            padding: 12px;
+            margin-bottom: 20px;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .player-card {
+            background: white;
+            border-radius: 20px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            transition: all 0.1s;
+            border-left: 8px solid;
+        }
+
+        .player-card.active {
+            background: #fff2cf;
+            box-shadow: 0 0 0 2px gold, 0 4px 10px black;
+            transform: scale(1.01);
+        }
+
+        .player-name {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .player-money {
+            font-family: monospace;
+            font-weight: bold;
+            background: #2e5e3b;
+            color: #ffd966;
+            padding: 4px 10px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        button {
+            background: #ffcd7e;
+            border: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            padding: 10px;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 3px 0 #b97f3a;
+            font-family: inherit;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #b97f3a;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        .build-sell-area {
+            background: #d9cdb0;
+            border-radius: 20px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+
+        .log-area {
+            background: #2a241a;
+            color: #f0e2b6;
+            border-radius: 20px;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            font-family: monospace;
+            margin-top: 16px;
+        }
+
+        .dice-result {
+            background: #c7a25e;
+            display: inline-block;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        hr {
+            border-color: #bbaa82;
+            margin: 12px 0;
+        }
+
+        .small-btn {
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            background: #b68b40;
+            color: white;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="game-wrapper">
+        <div class="board-area">
+            <canvas id="gameCanvas" width="800" height="800"></canvas>
+        </div>
+        <div class="info-panel">
+            <div class="turn-indicator" id="turnText">🎲 回合开始</div>
+            <div class="players-list" id="playersList"></div>
+            <div class="action-buttons">
+                <button id="rollBtn">🎲 掷骰子 🎲</button>
+                <button id="endTurnBtn" disabled>⏭️ 结束回合</button>
+                <button id="tradeBtn" disabled>🤝 简易交易</button>
+                <button id="buildBtn" disabled>🏠 建造房屋</button>
+            </div>
+            <div class="build-sell-area" id="propertyInfo">
+                <div>📍 当前地块: -</div>
+                <div id="landDetail"></div>
+            </div>
+            <div class="log-area" id="logPanel">
+                📜 游戏日志<br>
+                欢迎来到大富翁！<br>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- 经典大富翁棋盘数据 (40格) 简化中文版 地产+特殊格 ----------
+        const TILES = [
+            { name: "起点", type: "start", cost: 0, rent: 0, group: -1, color: "#c7a25e" },
+            { name: "台北", type: "property", cost: 400, rent: [40,200,600,1800,4000], group: 0, color: "#b87333", houseCost: 200 },
+            { name: "机会", type: "chance", cost: 0, rent: 0, group: -1, color: "#9acd32" },
+            { name: "香港", type: "property", cost: 500, rent: [50,250,750,2250,5000], group: 0, color: "#b87333", houseCost: 200 },
+            { name: "所得税", type: "tax", cost: 0, rent: 200, group: -1, color: "#e34234" },
+            { name: "火车站", type: "railroad", cost: 600, rent: [50,100,200,400], group: 10, color: "#a0a0a0" },
+            { name: "上海", type: "property", cost: 700, rent: [70,350,1050,3150,7000], group: 1, color: "#4682b4", houseCost: 300 },
+            { name: "机会", type: "chance", cost: 0, rent: 0, group: -1, color: "#9acd32" },
+            { name: "北京", type: "property", cost: 800, rent: [80,400,1200,3600,8000], group: 1, color: "#4682b4", houseCost: 300 },
+            { name: "广州", type: "property", cost: 900, rent: [90,450,1350,4050,9000], group: 1, color: "#4682b4", houseCost: 300 },
+            { name: "监狱", type: "jail", cost: 0, rent: 0, group: -1, color: "#ab8e5c" },
+            { name: "深圳", type: "property", cost: 1000, rent: [100,500,1500,4500,10000], group: 2, color: "#6b8e23", houseCost: 400 },
+            { name: "电力公司", type: "utility", cost: 800, rent: [40,100], group: 11, color: "#ffd700" },
+            { name: "成都", type: "property", cost: 1100, rent: [110,550,1650,4950,11000], group: 2, color: "#6b8e23", houseCost: 400 },
+            { name: "重庆", type: "property", cost: 1200, rent: [120,600,1800,5400,12000], group: 2, color: "#6b8e23", houseCost: 400 },
+            { name: "火车站", type: "railroad", cost: 600, rent: [50,100,200,400], group: 10, color: "#a0a0a0" },
+            { name: "杭州", type: "property", cost: 1300, rent: [130,650,1950,5850,13000], group: 3, color: "#cd5c5c", houseCost: 500 },
+            { name: "机会", type: "chance", cost: 0, rent: 0, group: -1, color: "#9acd32" },
+            { name: "苏州", type: "property", cost: 1400, rent: [140,700,2100,6300,14000], group: 3, color: "#cd5c5c", houseCost: 500 },
+            { name: "南京", type: "property", cost: 1500, rent: [150,750,2250,6750,15000], group: 3, color: "#cd5c5c", houseCost: 500 },
+            { name: "免费停车", type: "parking", cost: 0, rent: 0, group: -1, color: "#98fb98" },
+            { name: "武汉", type: "property", cost: 1600, rent: [160,800,2400,7200,16000], group: 4, color: "#d2691e", houseCost: 600 },
+            { name: "机会", type: "chance", cost: 0, rent: 0, group: -1, color: "#9acd32" },
+            { name: "长沙", type: "property", cost: 1700, rent: [170,850,2550,7650,17000], group: 4, color: "#d2691e", houseCost: 600 },
+            { name: "南昌", type: "property", cost: 1800, rent: [180,900,2700,8100,18000], group: 4, color: "#d2691e", houseCost: 600 },
+            { name: "火车站", type: "railroad", cost: 600, rent: [50,100,200,400], group: 10, color: "#a0a0a0" },
+            { name: "西安", type: "property", cost: 1900, rent: [190,950,2850,8550,19000], group: 5, color: "#9acd32", houseCost: 700 },
+            { name: "兰州", type: "property", cost: 2000, rent: [200,1000,3000,9000,20000], group: 5, color: "#9acd32", houseCost: 700 },
+            { name: "自来水厂", type: "utility", cost: 800, rent: [40,100], group: 11, color: "#00ced1" },
+            { name: "乌鲁木齐", type: "property", cost: 2100, rent: [210,1050,3150,9450,21000], group: 5, color: "#9acd32", houseCost: 700 },
+            { name: "入狱", type: "gotojail", cost: 0, rent: 0, group: -1, color: "#b22222" },
+            { name: "昆明", type: "property", cost: 2200, rent: [220,1100,3300,9900,22000], group: 6, color: "#da70d6", houseCost: 800 },
+            { name: "贵阳", type: "property", cost: 2300, rent: [230,1150,3450,10350,23000], group: 6, color: "#da70d6", houseCost: 800 },
+            { name: "机会", type: "chance", cost: 0, rent: 0, group: -1, color: "#9acd32" },
+            { name: "南宁", type: "property", cost: 2400, rent: [240,1200,3600,10800,24000], group: 6, color: "#da70d6", houseCost: 800 },
+            { name: "火车站", type: "railroad", cost: 600, rent: [50,100,200,400], group: 10, color: "#a0a0a0" },
+            { name: "机会", type: "chance", cost: 0, rent: 0, group: -1, color: "#9acd32" },
+            { name: "海口", type: "property", cost: 2500, rent: [250,1250,3750,11250,25000], group: 7, color: "#ffa07a", houseCost: 900 },
+            { name: "奢侈税", type: "tax", cost: 0, rent: 300, group: -1, color: "#ff8c69" },
+            { name: "三亚", type: "property", cost: 2600, rent: [260,1300,3900,11700,26000], group: 7, color: "#ffa07a", houseCost: 900 }
+        ];
+
+        // 机会/命运卡牌池 (经典效果)
+        const CHANCE_CARDS = [
+            { text: "银行发现错误，奖励💰200", money: 200, move: null, jail: false },
+            { text: "前进到起点，领取💰200", moveTo: 0, money: 200 },
+            { text: "去监狱！直接入狱", jail: true, moveTo: 10 },
+            { text: "市政厅修缮费，支付💰100", money: -100 },
+            { text: "获得出狱许可证", getOutOfJail: true },
+            { text: "前进到最近火车站", moveToNearestRail: true },
+            { text: "股票大涨，获得💰150", money: 150 },
+            { text: "后退三步", moveSteps: -3 },
+            { text: "房屋贷款，支付💰50每栋房屋", perHouseFee: 50 },
+            { text: "生日派对，每位玩家给你💰20", birthday: true }
+        ];
+
+        // ---------- 游戏全局变量 ----------
+        let players = [];
+        let currentPlayerIdx = 0;
+        let gameOver = false;
+        let waitingForRoll = true;       // 等待掷骰子阶段
+        let extraTurn = false;            // 额外回合标志
+        let doubleCount = 0;              // 连续对子次数
+        let currentDiceValue = 0;
+        let logEntries = [];
+
+        // 地皮拥有者与建筑状态 (key: tileIndex)
+        let propertyOwners = new Array(40).fill(null);
+        let propertyHouses = new Array(40).fill(0);   // 0-4, 4表示旅馆
+        let propertyMortgaged = new Array(40).fill(false);
+
+        // DOM 元素
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const rollBtn = document.getElementById('rollBtn');
+        const endTurnBtn = document.getElementById('endTurnBtn');
+        const tradeBtn = document.getElementById('tradeBtn');
+        const buildBtn = document.getElementById('buildBtn');
+        const turnText = document.getElementById('turnText');
+        const playersListDiv = document.getElementById('playersList');
+        const landDetailDiv = document.getElementById('landDetail');
+        const logPanel = document.getElementById('logPanel');
+
+        // 辅助函数
+        function addLog(msg) {
+            logEntries.unshift(msg);
+            if(logEntries.length > 30) logEntries.pop();
+            logPanel.innerHTML = "📜 游戏日志<br>" + logEntries.join("<br>");
+        }
+
+        // 获取玩家某颜色组的全部地块索引
+        function getPlayerGroupTiles(playerId, groupId) {
+            let indices = [];
+            for(let i=0;i<TILES.length;i++) {
+                if(TILES[i].type === "property" && TILES[i].group === groupId && propertyOwners[i] === playerId) {
+                    indices.push(i);
+                }
+            }
+            return indices;
+        }
+
+        // 检查某玩家是否拥有完整色组
+        function hasFullGroup(playerId, groupId) {
+            let required = TILES.filter(t => t.type === "property" && t.group === groupId).length;
+            let owned = getPlayerGroupTiles(playerId, groupId).length;
+            return owned === required && required > 0;
+        }
+
+        // 计算地产租金
+        function calcRent(tileIdx, ownerId) {
+            const tile = TILES[tileIdx];
+            if(tile.type === "property") {
+                let houses = propertyHouses[tileIdx];
+                let baseRent = tile.rent[houses];
+                if(hasFullGroup(ownerId, tile.group) && houses===0) baseRent = baseRent * 2;
+                return baseRent;
+            } else if(tile.type === "railroad") {
+                let ownedCount = 0;
+                for(let i=0;i<TILES.length;i++) if(TILES[i].type==="railroad" && propertyOwners[i]===ownerId) ownedCount++;
+                return tile.rent[ownedCount-1] || 50;
+            } else if(tile.type === "utility") {
+                let ownedCount = 0;
+                for(let i=0;i<TILES.length;i++) if(TILES[i].type==="utility" && propertyOwners[i]===ownerId) ownedCount++;
+                let multiplier = (ownedCount === 2) ? 10 : 4;
+                return currentDiceValue ? currentDiceValue * multiplier : 40;
+            }
+            return 0;
+        }
+
+        // 购买地产
+        function buyProperty(player, tileIdx) {
+            let cost = TILES[tileIdx].cost;
+            if(propertyOwners[tileIdx] !== null) return false;
+            if(player.money >= cost) {
+                player.money -= cost;
+                propertyOwners[tileIdx] = player.id;
+                addLog(`${player.name} 购买了 ${TILES[tileIdx].name} 花费 ${cost}`);
+                renderUI();
+                return true;
+            } else {
+                addLog(`${player.name} 资金不足，无法购买 ${TILES[tileIdx].name}`);
+                return false;
+            }
+        }
+
+        // 支付租金
+        function payRent(owner, player, amount) {
+            if(owner.id === player.id) return true;
+            if(player.money >= amount) {
+                player.money -= amount;
+                owner.money += amount;
+                addLog(`${player.name} 支付租金 ${amount} 给 ${owner.name}`);
+                renderUI();
+                return true;
+            } else {
+                addLog(`${player.name} 资金不足支付租金 ${amount}，破产！`);
+                bankruptPlayer(player);
+                return false;
+            }
+        }
+
+        // 破产处理
+        function bankruptPlayer(player) {
+            let idx = players.findIndex(p => p.id === player.id);
+            if(idx !== -1) {
+                // 将所有地产归还银行
+                for(let i=0;i<propertyOwners.length;i++) {
+                    if(propertyOwners[i] === player.id) {
+                        propertyOwners[i] = null;
+                        propertyHouses[i] = 0;
+                    }
+                }
+                players.splice(idx,1);
+                addLog(`${player.name} 破产退出了游戏！`);
+                if(players.length === 1) {
+                    gameOver = true;
+                    addLog(`🏆 游戏结束！ ${players[0].name} 获胜！ 🏆`);
+                    rollBtn.disabled = true;
+                    endTurnBtn.disabled = true;
+                    tradeBtn.disabled = true;
+                    buildBtn.disabled = true;
+                    turnText.innerText = `🏆 胜利者 ${players[0].name}`;
+                } else {
+                    if(currentPlayerIdx >= players.length) currentPlayerIdx = 0;
+                    renderUI();
+                }
+            }
+        }
+
+        // 掷骰子逻辑
+        function rollDice() {
+            if(gameOver) return;
+            if(!waitingForRoll) {
+                addLog("请先结束当前回合！");
+                return;
+            }
+            let player = players[currentPlayerIdx];
+            if(player.inJail) {
+                // 监狱处理
+                addLog(`${player.name} 在监狱中，尝试掷骰子出狱`);
+                let dice1 = Math.floor(Math.random()*6)+1;
+                let dice2 = Math.floor(Math.random()*6)+1;
+                let sum = dice1+dice2;
+                addLog(`掷出 ${dice1} + ${dice2} = ${sum}`);
+                if(dice1 === dice2) {
+                    player.inJail = false;
+                    addLog(`${player.name} 掷出对子，成功出狱！移动 ${sum} 步。`);
+                    movePlayer(player, sum);
+                } else {
+                    player.jailTurns = (player.jailTurns || 0)+1;
+                    if(player.jailTurns >= 3) {
+                        player.money -= 50;
+                        player.inJail = false;
+                        player.jailTurns = 0;
+                        addLog(`${player.name} 监狱满3回合，支付50元出狱。移动 ${sum} 步。`);
+                        movePlayer(player, sum);
+                    } else {
+                        addLog(`${player.name} 未能出狱，结束回合`);
+                        waitingForRoll = true;
+                        endTurnBtn.disabled = false;
+                        rollBtn.disabled = true;
+                        renderUI();
+                        return;
+                    }
+                }
+            } else {
+                let dice1 = Math.floor(Math.random()*6)+1;
+                let dice2 = Math.floor(Math.random()*6)+1;
+                let sum = dice1+dice2;
+                currentDiceValue = sum;
+                addLog(`${player.name} 掷出 ${dice1} + ${dice2} = ${sum}`);
+                movePlayer(player, sum);
+                if(dice1 === dice2) {
+                    doubleCount++;
+                    if(doubleCount === 3) {
+                        addLog("连续三次对子，超速入狱！");
+                        goToJail(player);
+                        doubleCount = 0;
+                        waitingForRoll = true;
+                        endTurnBtn.disabled = false;
+                        rollBtn.disabled = true;
+                        renderUI();
+                        return;
+                    } else {
+                        addLog(`再掷一次！`);
+                        waitingForRoll = false;
+                        rollBtn.disabled = true;
+                        endTurnBtn.disabled = false;
+                        renderUI();
+                        return;
+                    }
+                } else {
+                    doubleCount = 0;
+                }
+            }
+            waitingForRoll = false;
+            rollBtn.disabled = true;
+            endTurnBtn.disabled = false;
+            renderUI();
+        }
+
+        function movePlayer(player, steps) {
+            let oldPos = player.position;
+            let newPos = (oldPos + steps) % 40;
+            player.position = newPos;
+            if(newPos < oldPos && oldPos+steps >=40) { // 经过起点
+                player.money += 200;
+                addLog(`${player.name} 经过起点，获得200元`);
+            }
+            addLog(`${player.name} 移动到 ${TILES[newPos].name}`);
+            renderCanvas();
+            // 落地触发事件
+            handleLandOnTile(player, newPos);
+        }
+
+        function handleLandOnTile(player, tileIdx) {
+            let tile = TILES[tileIdx];
+            if(tile.type === "property" || tile.type === "railroad" || tile.type === "utility") {
+                let ownerId = propertyOwners[tileIdx];
+                if(ownerId === null) {
+                    // 询问购买
+                    if(player.money >= tile.cost) {
+                        if(confirm(`是否购买 ${tile.name} 价格 ${tile.cost} 元？`)) {
+                            buyProperty(player, tileIdx);
+                        } else {
+                            addLog(`${player.name} 放弃购买 ${tile.name}`);
+                        }
+                    } else {
+                        addLog(`资金不足无法购买 ${tile.name}`);
+                    }
+                } else if(ownerId !== player.id) {
+                    let owner = players.find(p=>p.id === ownerId);
+                    let rent = calcRent(tileIdx, ownerId);
+                    payRent(owner, player, rent);
+                } else {
+                    addLog(`停留在自己的地产 ${tile.name}`);
+                }
+            } else if(tile.type === "chance") {
+                drawChanceCard(player);
+            } else if(tile.type === "tax") {
+                let tax = tile.rent;
+                if(player.money >= tax) {
+                    player.money -= tax;
+                    addLog(`${player.name} 支付税费 ${tax} 元`);
+                } else bankruptPlayer(player);
+            } else if(tile.type === "gotojail") {
+                goToJail(player);
+            }
+            renderUI();
+        }
+
+        function goToJail(player) {
+            player.position = 10;
+            player.inJail = true;
+            player.jailTurns = 0;
+            addLog(`${player.name} 被送入监狱！`);
+            renderCanvas();
+        }
+
+        function drawChanceCard(player) {
+            let card = CHANCE_CARDS[Math.floor(Math.random() * CHANCE_CARDS.length)];
+            addLog(`机会卡: ${card.text}`);
+            if(card.money) player.money += card.money;
+            if(card.moveTo !== undefined) {
+                player.position = card.moveTo;
+                addLog(`${player.name} 移动到 ${TILES[player.position].name}`);
+                handleLandOnTile(player, player.position);
+            }
+            if(card.jail) goToJail(player);
+            if(card.getOutOfJail) player.outOfJailCard = (player.outOfJailCard||0)+1;
+            if(card.moveSteps) {
+                let newPos = (player.position + card.moveSteps + 40)%40;
+                player.position = newPos;
+                addLog(`后退3步到 ${TILES[newPos].name}`);
+                handleLandOnTile(player, newPos);
+            }
+            if(card.perHouseFee) {
+                let houses = 0;
+                for(let i=0;i<propertyOwners.length;i++) if(propertyOwners[i]===player.id) houses += propertyHouses[i];
+                let fee = houses * card.perHouseFee;
+                player.money -= fee;
+                addLog(`支付房屋维护费 ${fee} 元`);
+            }
+            if(card.birthday) {
+                for(let p of players) {
+                    if(p.id !== player.id) {
+                        let gift = 20;
+                        if(p.money >= gift) {
+                            p.money -= gift;
+                            player.money += gift;
+                            addLog(`${p.name} 给 ${player.name} 生日礼金20元`);
+                        }
+                    }
+                }
+            }
+            renderUI();
+        }
+
+        // 建造房屋
+        function showBuildMenu() {
+            let player = players[currentPlayerIdx];
+            let ownTiles = [];
+            for(let i=0;i<TILES.length;i++) {
+                if(propertyOwners[i] === player.id && TILES[i].type==="property") ownTiles.push(i);
+            }
+            let groupsCanBuild = [];
+            for(let i of ownTiles) {
+                let group = TILES[i].group;
+                if(hasFullGroup(player.id, group) && !propertyMortgaged[i] && propertyHouses[i] < 4) {
+                    if(!groupsCanBuild.includes(group)) groupsCanBuild.push(group);
+                }
+            }
+            if(groupsCanBuild.length===0) {
+                addLog("没有可建造房屋的完整色组地块！");
+                return;
+            }
+            let tileIdx = prompt("请输入地块编号(0~39)建造房屋:", ownTiles[0]);
+            if(tileIdx && ownTiles.includes(parseInt(tileIdx))) {
+                let idx = parseInt(tileIdx);
+                let tile = TILES[idx];
+                if(propertyHouses[idx] < 4 && hasFullGroup(player.id, tile.group)) {
+                    let cost = tile.houseCost;
+                    if(player.money >= cost) {
+                        player.money -= cost;
+                        propertyHouses[idx]++;
+                        addLog(`${player.name} 在 ${tile.name} 建造房屋，花费 ${cost}`);
+                        renderUI();
+                    } else addLog("资金不足");
+                } else addLog("无法建造");
+            }
+        }
+
+        // 简易交易: 现金转移演示
+        function tradeWith() {
+            let player = players[currentPlayerIdx];
+            let targets = players.filter(p=>p.id !== player.id);
+            if(targets.length===0) return;
+            let targetNames = targets.map(p=>`${p.id}:${p.name}`).join(",");
+            let targetId = prompt(`选择交易对象ID: ${targetNames}`, targets[0].id);
+            let target = players.find(p=>p.id == targetId);
+            if(target) {
+                let amount = parseInt(prompt("交易金额(正数自己支付给对手):", "100"));
+                if(!isNaN(amount) && player.money >= amount && amount>0) {
+                    player.money -= amount;
+                    target.money += amount;
+                    addLog(`${player.name} 支付 ${amount} 给 ${target.name}`);
+                } else addLog("金额无效或资金不足");
+            }
+            renderUI();
+        }
+
+        function endTurn() {
+            if(waitingForRoll) {
+                addLog("还未掷骰子，不能结束");
+                return;
+            }
+            currentPlayerIdx = (currentPlayerIdx+1) % players.length;
+            waitingForRoll = true;
+            doubleCount = 0;
+            currentDiceValue = 0;
+            rollBtn.disabled = false;
+            endTurnBtn.disabled = true;
+            tradeBtn.disabled = false;
+            buildBtn.disabled = false;
+            renderUI();
+            addLog(`轮到 ${players[currentPlayerIdx].name} 的回合`);
+        }
+
+        // UI渲染
+        function renderUI() {
+            if(players.length === 0) return;
+            let current = players[currentPlayerIdx];
+            turnText.innerHTML = `🎲 ${current.name} 回合 ${waitingForRoll ? "请掷骰子" : "行动中"} ${current.inJail ? "(监狱中)" : ""}`;
+            playersListDiv.innerHTML = players.map(p => {
+                let activeClass = (p.id === current.id) ? "active" : "";
+                return `<div class="player-card ${activeClass}" style="border-left-color: ${p.color}">
+                            <span class="player-name">${p.name}</span>
+                            <span class="player-money">💰 ${p.money}</span>
+                        </div>`;
+            }).join("");
+            let landIdx = current.position;
+            let land = TILES[landIdx];
+            let owner = propertyOwners[landIdx] !== null ? players.find(p=>p.id===propertyOwners[landIdx]) : null;
+            landDetailDiv.innerHTML = `<b>${land.name}</b><br>类型: ${land.type}<br>${owner ? `拥有者: ${owner.name}` : "无主"} ${propertyHouses[landIdx] ? `房屋: ${propertyHouses[landIdx]}` : ""}`;
+            renderCanvas();
+        }
+
+        function renderCanvas() {
+            ctx.clearRect(0,0,800,800);
+            let s = 800/11; // 粗略绘制网格
+            for(let i=0;i<40;i++){
+                let pos = getTileCoord(i);
+                ctx.fillStyle = TILES[i].color;
+                ctx.fillRect(pos.x, pos.y, s*0.9, s*0.9);
+                ctx.fillStyle = "black";
+                ctx.font = "12px sans-serif";
+                ctx.fillText(TILES[i].name.substring(0,4), pos.x+5, pos.y+20);
+                if(propertyOwners[i] !== null){
+                    let owner = players.find(p=>p.id===propertyOwners[i]);
+                    if(owner) ctx.fillStyle = owner.color;
+                    else ctx.fillStyle = "gray";
+                    ctx.fillRect(pos.x+5, pos.y+40, 15, 15);
+                }
+            }
+            for(let p of players){
+                let coord = getTileCoord(p.position);
+                ctx.beginPath();
+                ctx.fillStyle = p.color;
+                ctx.arc(coord.x+30, coord.y+30, 12, 0, 2*Math.PI);
+                ctx.fill();
+                ctx.fillStyle = "white";
+                ctx.font = "bold 14px sans-serif";
+                ctx.fillText(p.name.charAt(0), coord.x+24, coord.y+35);
+            }
+        }
+
+        function getTileCoord(index){
+            let s = 800/11;
+            let side = Math.floor(index/10);
+            let pos = index%10;
+            if(side===0) return {x: s*10 - s*pos, y: s*10};
+            if(side===1) return {x: 0, y: s*10 - s*pos};
+            if(side===2) return {x: s*pos, y: 0};
+            return {x: s*10, y: s*pos};
+        }
+
+        function initGame() {
+            players = [
+                { id:0, name:"金贝贝", money:3000, position:0, color:"#FF4136", inJail:false, jailTurns:0 },
+                { id:1, name:"钱夫人", money:3000, position:0, color:"#2ECC40", inJail:false, jailTurns:0 },
+                { id:2, name:"阿土伯", money:3000, position:0, color:"#0074D9", inJail:false, jailTurns:0 }
+            ];
+            currentPlayerIdx = 0;
+            gameOver = false;
+            waitingForRoll = true;
+            doubleCount = 0;
+            propertyOwners.fill(null);
+            propertyHouses.fill(0);
+            propertyMortgaged.fill(false);
+            addLog("游戏开始！大富翁3人局");
+            renderUI();
+            rollBtn.disabled = false;
+            endTurnBtn.disabled = true;
+            tradeBtn.disabled = false;
+            buildBtn.disabled = false;
+            rollBtn.onclick = rollDice;
+            endTurnBtn.onclick = endTurn;
+            tradeBtn.onclick = tradeWith;
+            buildBtn.onclick = showBuildMenu;
+        }
+        initGame();
+    })();
+</script>
+</body>
+</html>
