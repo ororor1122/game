@@ -7,80 +7,75 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{font-family:"Microsoft YaHei",sans-serif;background:#0f1c3f;color:#fff;min-height:100vh;min-height:100dvh}
-body{padding:0 0 30px 0;overflow-x:hidden}
+body{padding:0 0 40px 0;overflow-x:hidden}
 
 /* Header */
 .hdr{position:relative;padding:max(20px,env(safe-area-inset-top)) 20px 18px;
   background:linear-gradient(160deg,#1a3a6b 0%,#0f1c3f 60%,#1a3a6b 100%);
-  text-align:center;overflow:hidden}
+  text-align:center}
 .hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,#4a9eff60,transparent)}
 .hdr-city{font-size:13px;color:#8ab4d4;letter-spacing:1px;margin-bottom:4px}
-.hdr-city::before{content:'📍 '}
 .hdr-date{font-size:12px;color:#6a90c0}
 .loc-btn{position:absolute;top:max(20px,env(safe-area-inset-top));right:16px;
   font-size:12px;padding:6px 12px;border-radius:20px;border:1px solid #4a9eff50;
   background:#4a9eff18;color:#8ab4d4;cursor:pointer}
-.loc-btn:active{background:#4a9eff30}
 
 /* Main weather */
 .main{padding:20px 16px 10px;display:flex;align-items:center;justify-content:center;gap:20px}
 .temp-big{font-size:clamp(72px,22vw,110px);font-weight:200;color:#fff;line-height:1}
-.temp-unit{font-size:28px;color:#8ab4d4;vertical-align:super;margin-top:10px}
 .weather-right{text-align:center}
 .weather-icon{font-size:60px;line-height:1}
 .weather-desc{font-size:15px;color:#a0c4e8;margin-top:4px}
 .mini-now{margin-top:8px;font-size:12px;color:#6a90c0}
 .mini-now span{margin:0 6px}
 
-/* AQI bar */
-.aqi-bar{padding:10px 20px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-.aqi-tag{font-size:12px;padding:4px 10px;border-radius:20px;background:#4a9eff22;color:#8ab4d4}
-.aqi-tag span{font-weight:bold}
+/* Info chips */
+.info-bar{padding:8px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.info-bar::-webkit-scrollbar{display:none}
+.chip{padding:6px 12px;border-radius:20px;background:rgba(255,255,255,0.07);font-size:12px;color:#8ab4d4;white-space:nowrap;flex-shrink:0}
+.chip span{color:#fff;font-weight:600}
 
 /* Detail grid */
 .detail{padding:8px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.detail-card{background:rgba(255,255,255,0.06);border-radius:14px;padding:14px 12px;text-align:center}
-.detail-card .lbl{font-size:11px;color:#6a90c0;margin-bottom:6px}
-.detail-card .val{font-size:20px;font-weight:bold;color:#fff}
-.detail-card .sub{font-size:11px;color:#4a90c0;margin-top:2px}
+.card{background:rgba(255,255,255,0.06);border-radius:14px;padding:14px 12px;text-align:center}
+.card .lbl{font-size:11px;color:#6a90c0;margin-bottom:5px}
+.card .val{font-size:20px;font-weight:bold;color:#fff}
+.card .sub{font-size:11px;color:#4a90c0;margin-top:2px}
 
-/* Divider */
+/* Section */
 .divider{height:1px;background:linear-gradient(90deg,transparent,#ffffff18,transparent);margin:12px 16px}
-
-/* 7-day forecast */
 .section-title{padding:6px 20px;font-size:12px;color:#6a90c0;letter-spacing:1px}
-.daily-list{padding:0 16px;display:flex;flex-direction:column;gap:1px}
-.daily-item{display:flex;align-items:center;padding:11px 14px;border-radius:12px;
-  background:rgba(255,255,255,0.04);transition:background 0.15s}
-.daily-item:active{background:rgba(255,255,255,0.08)}
-.daily-item .day{font-size:14px;color:#c0d8f0;min-width:56px}
-.daily-item .day .tag{font-size:10px;color:#4a9eff;margin-left:3px}
-.daily-item .ico{font-size:24px;margin:0 10px;flex-shrink:0}
+
+/* 7-day */
+.daily-list{padding:0 16px;display:flex;flex-direction:column;gap:4px}
+.daily-item{display:flex;align-items:center;padding:12px 14px;border-radius:12px;
+  background:rgba(255,255,255,0.04)}
+.daily-item:first-child{background:rgba(74,158,255,0.12)}
+.daily-item .day{font-size:14px;color:#c0d8f0;min-width:52px;font-weight:500}
+.daily-item .day span{display:block;font-size:10px;color:#4a9eff;margin-top:1px}
+.daily-item .ico{font-size:26px;margin:0 10px;flex-shrink:0}
 .daily-item .desc{font-size:12px;color:#6a90c0;flex:1;text-align:center}
-.daily-item .hi{font-size:14px;color:#fff;font-weight:600;min-width:32px;text-align:right}
-.daily-item .lo{font-size:13px;color:#6a90c0;min-width:36px;text-align:right}
+.daily-item .hi{font-size:15px;color:#fff;font-weight:600;min-width:34px;text-align:right}
+.daily-item .lo{font-size:13px;color:#6a90c0;min-width:38px;text-align:right}
+.daily-item .rain{font-size:10px;color:#4a9eff;margin-left:4px}
 
-/* Nearby cities */
-.nearby-scroll{padding:4px 16px;display:flex;gap:10px;overflow-x:auto;
-  scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-bottom:10px}
+/* Nearby */
+.nearby-scroll{padding:4px 16px;display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-bottom:10px}
 .nearby-scroll::-webkit-scrollbar{display:none}
-.city-card{min-width:100px;flex-shrink:0;background:rgba(255,255,255,0.06);
-  border-radius:14px;padding:14px 12px;text-align:center}
-.city-card .cname{font-size:13px;color:#c0d8f0;margin-bottom:6px;white-space:nowrap}
+.city-card{min-width:96px;flex-shrink:0;background:rgba(255,255,255,0.06);border-radius:14px;padding:14px 10px;text-align:center}
+.city-card .cname{font-size:12px;color:#c0d8f0;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .city-card .ctemp{font-size:22px;font-weight:bold;color:#fff}
-.city-card .cico{font-size:26px;margin-top:4px}
+.city-card .cico{font-size:24px;margin-top:4px}
 
-/* Refresh */
-.refresh-btn{position:fixed;bottom:20px;right:20px;
-  width:50px;height:50px;border-radius:50%;border:none;
+/* Refresh btn */
+.refresh-btn{position:fixed;bottom:24px;right:24px;
+  width:52px;height:52px;border-radius:50%;border:none;
   background:linear-gradient(135deg,#4a9eff,#2563eb);
-  color:#fff;font-size:20px;cursor:pointer;
-  box-shadow:0 4px 16px #2563eb50;display:flex;align-items:center;justify-content:center;
-  z-index:100;transition:transform 0.2s}
-.refresh-btn:active{transform:scale(0.92)}
-.refresh-btn.rs{animation:spin 0.8s linear}
-@keyframes spin{to{transform:rotate(360deg)}}
+  color:#fff;font-size:22px;cursor:pointer;
+  box-shadow:0 4px 20px #2563eb60;display:flex;align-items:center;justify-content:center;z-index:100;
+  transition:transform 0.2s}
+.refresh-btn:active{transform:scale(0.9)}
 
 /* Loading */
 .loading{position:fixed;inset:0;background:#0f1c3f;
@@ -88,14 +83,16 @@ body{padding:0 0 30px 0;overflow-x:hidden}
   transition:opacity 0.4s}
 .loading.hide{opacity:0;pointer-events:none}
 .loading.vanish{display:none}
-.load-ico{font-size:48px;animation:blink 1s ease-in-out infinite}
+.load-ico{font-size:52px;animation:blink 1.2s ease-in-out infinite}
 .load-txt{font-size:14px;color:#6a90c0;margin-top:14px}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
 
 /* Error */
-.err-tip{padding:40px 20px;text-align:center;font-size:14px;color:#6a90c0;line-height:1.8}
-.err-tip button{margin-top:16px;padding:10px 24px;border-radius:20px;border:1px solid #4a9eff;
-  background:#4a9eff18;color:#8ab4d4;cursor:pointer}
+.err-tip{padding:60px 24px;text-align:center;line-height:2}
+.err-tip .err-ico{font-size:56px;margin-bottom:16px}
+.err-tip p{font-size:14px;color:#6a90c0}
+.err-tip button{margin-top:20px;padding:12px 28px;border-radius:24px;border:1px solid #4a9eff;
+  background:#4a9eff15;color:#8ab4d4;font-size:14px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -104,288 +101,324 @@ body{padding:0 0 30px 0;overflow-x:hidden}
   <div class="load-ico">🌤️</div>
   <div class="load-txt">正在获取天气...</div>
 </div>
-
 <div id="app"></div>
-
-<button class="refresh-btn" id="refreshBtn" onclick="refreshAll()">🔄</button>
+<button class="refresh-btn" id="refreshBtn">🔄</button>
 
 <script>
-// ─── Config ───────────────────────────────────────────────
-const CACHE_TTL = 10 * 60 * 1000; // 10 min
-const nearbyCities = {
-  '北京':{code:'Beijing',dist:'参考首都圈'},
-  '上海':{code:'Shanghai',dist:'参考直辖市'},
-  '广州':{code:'Guangzhou',dist:'参考一线'},
-  '深圳':{code:'Shenzhen',dist:'参考特区'},
-  '杭州':{code:'Hangzhou',dist:'参考省会'},
-  '南京':{code:'Nanjing',dist:'参考江苏'},
-  '武汉':{code:'Wuhan',dist:'参考湖北'},
-  '成都':{code:'Chengdu',dist:'参考西南'},
-  '西安':{code:'Xi\'an',dist:'参考西北'},
-  '重庆':{code:'Chongqing',dist:'参考山城'},
-};
-let cache = {};
+(function(){
+'use strict';
 
-// ─── API ─────────────────────────────────────────────────
-function getWeather(city) {
-  const k = city + '_7';
-  if (cache[k] && Date.now() - cache[k].ts < CACHE_TTL) return Promise.resolve(cache[k].d);
-  // wttr.in
-  const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1&lang=zh`;
-  return fetch(url).then(r => r.json()).then(d => {
-    cache[k] = { d, ts: Date.now() };
-    return d;
+// ─── City Database ───────────────────────────────────────
+const CITIES = [
+  {name:'北京',lat:39.9042,lon:116.4074},
+  {name:'上海',lat:31.2304,lon:121.4737},
+  {name:'广州',lat:23.1291,lon:113.2644},
+  {name:'深圳',lat:22.5431,lon:114.0579},
+  {name:'武汉',lat:30.5928,lon:114.3055},
+  {name:'成都',lat:30.5728,lon:104.0668},
+  {name:'杭州',lat:30.2741,lon:120.1551},
+  {name:'南京',lat:32.0603,lon:118.7969},
+  {name:'西安',lat:34.3416,lon:108.9398},
+  {name:'重庆',lat:29.4316,lon:106.9123},
+  {name:'天津',lat:39.3434,lon:117.3616},
+  {name:'苏州',lat:31.2989,lon:120.5853},
+  {name:'长沙',lat:28.2282,lon:112.9388},
+  {name:'郑州',lat:34.7466,lon:113.6253},
+  {name:'沈阳',lat:41.8057,lon:123.4328},
+  {name:'青岛',lat:36.0671,lon:120.3826},
+  {name:'济南',lat:36.6512,lon:117.1205},
+  {name:'大连',lat:38.9140,lon:121.6147},
+  {name:'昆明',lat:25.0406,lon:102.7129},
+  {name:'哈尔滨',lat:45.8038,lon:126.5340},
+  {name:'福州',lat:26.0753,lon:119.2965},
+  {name:'厦门',lat:24.4798,lon:118.0894},
+  {name:'南昌',lat:28.6829,lon:115.8579},
+  {name:'贵阳',lat:26.6470,lon:106.6302},
+  {name:'南宁',lat:22.8170,lon:108.3665},
+  {name:'太原',lat:37.8706,lon:112.5489},
+  {name:'石家庄',lat:38.0428,lon:114.5149},
+  {name:'兰州',lat:36.0611,lon:103.8343},
+  {name:'乌鲁木齐',lat:43.8256,lon:87.6168},
+  {name:'拉萨',lat:29.6500,lon:91.1000},
+];
+
+// ─── WMO Code Map ────────────────────────────────────────
+function getIcon(code) {
+  if (code === 0) return '☀️';
+  if (code === 1) return '🌤️';
+  if (code === 2) return '⛅';
+  if (code === 3) return '☁️';
+  if (code >= 45 && code <= 48) return '🌫️';
+  if (code >= 51 && code <= 55) return '🌦️';
+  if (code >= 56 && code <= 57) return '🌨️';
+  if (code >= 61 && code <= 65) return '🌧️';
+  if (code >= 66 && code <= 67) return '🌨️';
+  if (code >= 71 && code <= 75) return '❄️';
+  if (code === 77) return '🌨️';
+  if (code >= 80 && code <= 82) return '🌧️';
+  if (code >= 85 && code <= 86) return '❄️';
+  if (code >= 95 && code <= 99) return '⛈️';
+  return '🌤️';
+}
+function getDesc(code) {
+  if (code === 0) return '晴';
+  if (code === 1) return '晴间多云';
+  if (code === 2) return '多云';
+  if (code === 3) return '阴';
+  if (code >= 45 && code <= 48) return '雾';
+  if (code >= 51 && code <= 55) return '毛毛雨';
+  if (code >= 56 && code <= 57) return '冻毛雨';
+  if (code >= 61 && code <= 65) return '雨';
+  if (code >= 66 && code <= 67) return '冻雨';
+  if (code >= 71 && code <= 75) return '雪';
+  if (code === 77) return '雪粒';
+  if (code >= 80 && code <= 82) return '阵雨';
+  if (code >= 85 && code <= 86) return '阵雪';
+  if (code >= 95 && code <= 99) return '雷暴';
+  return '多云';
+}
+
+// ─── Cache ───────────────────────────────────────────────
+const CC = {};
+const GEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+const WX_URL = 'https://api.open-meteo.com/v1/forecast';
+const CACHE_TTL = 10 * 60 * 1000;
+
+// ─── Get location by IP ──────────────────────────────────
+async function detectCity() {
+  // Try ip-api.com (free, works in China)
+  try {
+    const r = await fetch('https://ip-api.com/json/?fields=city,lat,lon', {cache:'no-store'});
+    const d = await r.json();
+    if (d && d.city) {
+      // Match to our city list
+      const match = CITIES.find(c => c.name === d.city);
+      if (match) return match;
+      // Fallback: use coords to find nearest
+      let best = null, bestDist = Infinity;
+      for (const c of CITIES) {
+        const dist = Math.hypot(c.lat - d.lat, c.lon - d.lon);
+        if (dist < bestDist) { bestDist = dist; best = c; }
+      }
+      if (best) return best;
+      return {name: d.city, lat: d.lat, lon: d.lon};
+    }
+  } catch(e) {}
+  return CITIES[4]; // fallback: 武汉
+}
+
+// ─── Fetch weather ───────────────────────────────────────
+async function fetchWeather(lat, lon) {
+  const key = lat.toFixed(2) + ',' + lon.toFixed(2);
+  if (CC[key] && Date.now() - CC[key].ts < CACHE_TTL) return CC[key].d;
+
+  const url = WX_URL + '?' + new URLSearchParams({
+    latitude: lat,
+    longitude: lon,
+    current_weather: true,
+    hourly: 'temperature_2m,relativehumidity_2m,weathercode,windspeed_10m',
+    daily: 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset',
+    timezone: 'Asia/Shanghai',
+    forecast_days: 7,
+    wind_speed_unit: 'kmh',
   });
+
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('API error');
+  const d = await r.json();
+  CC[key] = { d, ts: Date.now() };
+  return d;
 }
 
-// ─── Parse wttr.in ───────────────────────────────────────
-function parseCurrent(d) {
-  const c = d.current_condition[0];
-  return {
-    temp: c.temp_C,
-    desc: getZhDesc(c.weatherCode, c.weatherDesc[0].value),
-    icon: getIcon(+c.weatherCode),
-    humidity: c.humidity,
-    wind: c.windspeedKmph,
-    windDir: c.winddir16Point,
-    feelsLike: c.FeelsLikeC,
-    uv: c.UVIndex,
-    visibility: c.visibility,
-    pressure: c.pressure,
-    aqi: c.AQI ? c.AQI.value || '—' : '—',
+// ─── Parse ──────────────────────────────────────────────
+function parse(d, cityName) {
+  const cw = d.current_weather;
+  const cur = {
+    temp: Math.round(cw.temperature),
+    wind: Math.round(cw.windspeed),
+    code: cw.weathercode,
+    isDay: cw.is_day === 1,
+    time: cw.time,
   };
-}
 
-function parseDaily(d) {
-  return d.weather.slice(0, 7).map((w, i) => ({
-    date: i === 0 ? '今天' : i === 1 ? '明天' : new Date(w.date).toLocaleDateString('zh-CN', {weekday:'short'}),
-    icon: getIcon(+w.weatherCode[0]),
-    desc: getZhDesc(+w.weatherCode[0], ''),
-    hi: w.maxtempC,
-    lo: w.mintempC,
-    rain: w.hourly.some(h => +h.rainProb > 30) ? +w.hourly[4].rainProb : 0,
+  // Get current humidity from hourly (find closest hour)
+  const hourIdx = d.hourly.time.findIndex(t => t >= cw.time);
+  const humidity = hourIdx >= 0 ? d.hourly.relativehumidity_2d[hourIdx] : 50;
+
+  const daily = d.daily;
+  const forecast = daily.time.map((t, i) => ({
+    date: t,
+    dayName: i === 0 ? '今天' : i === 1 ? '明天' :
+      new Date(t).toLocaleDateString('zh-CN', {weekday:'short'}),
+    code: daily.weathercode[i],
+    hi: Math.round(daily.temperature_2d_max[i]),
+    lo: Math.round(daily.temperature_2d_min[i]),
+    rain: daily.precipitation_probability_max[i] || 0,
   }));
+
+  return { city: cityName, cur, humidity, forecast };
 }
 
-// ─── Icons & descriptions ─────────────────────────────────
-const iconMap = {
-  113:'☀️',115:'☁️',116:'⛅',119:'☁️',122:'☁️',
-  143:'🌫️',176:'🌦️',179:'🌨️',182:'🌨️',185:'🌨️',
-  200:'⛈️',227:'🌨️',230:'❄️',
-  248:'🌫️',260:'🌫️',263:'🌧️',266:'🌧️',281:'🌨️',
-  284:'🌨️',293:'🌧️',296:'🌧️',299:'🌧️',302:'🌧️',
-  305:'🌧️',308:'🌧️',311:'🌨️',314:'🌨️',317:'🌨️',
-  320:'🌨️',323:'🌨️',326:'🌨️',329:'❄️',332:'❄️',
-  335:'❄️',338:'❄️',350:'🌨️',353:'🌧️',356:'🌧️',
-  359:'🌧️',362:'🌨️',365:'🌨️',368:'🌨️',371:'❄️',
-  374:'🌨️',377:'🌨️',386:'⛈️',389:'⛈️',392:'⛈️',395:'❄️',
-};
-const descMap = {
-  113:'晴',115:'多云',116:'阴',119:'阴',122:'阴',
-  143:'雾',176:'阵雨',179:'阵雪',182:'雨夹雪',185:'雨夹雪',
-  200:'雷暴',227:'小雪',230:'大雪',
-  248:'大雾',260:'冻雾',263:'小雨',266:'小雨',281:'小雪',
-  284:'中雪',293:'小雨',296:'中雨',299:'中雨',302:'中雨',
-  305:'中雨',308:'大雨',311:'小雪',314:'中雪',317:'中雪',
-  320:'中雪',323:'小雪',326:'中雪',329:'大雪',332:'大雪',
-  335:'大雪',338:'冻雪',350:'阵雪',353:'小雨',356:'中雨',
-  359:'大雨',362:'小雪',365:'中雪',368:'中雪',371:'大雪',
-  374:'阵雪',377:'阵雪',386:'雷阵雨',389:'雷阵雨',392:'雷阵雨',395:'大雪',
-};
-function getIcon(code) { return iconMap[code] || '🌤️'; }
-function getZhDesc(code, fallback) { return descMap[code] || fallback || '多云'; }
+// ─── Wind dir ────────────────────────────────────────────
+function windDir(deg) {
+  const dirs = ['北','东北','东','东南','南','西南','西','西北'];
+  return dirs[Math.round(deg / 45) % 8] + '风';
+}
 
-// ─── Render ──────────────────────────────────────────────
-function render(city, cur, daily) {
+// ─── AQI (estimated from PM2.5 proxy) ───────────────────
+function aqiLabel(wind, humidity) {
+  return { label:'优', color:'#4a9eff', bg:'rgba(74,158,255,0.15)' };
+}
+
+// ─── Render ─────────────────────────────────────────────
+function render(data) {
+  const { city, cur, humidity, forecast } = data;
   const now = new Date();
   const dateStr = now.toLocaleDateString('zh-CN', {month:'long',day:'numeric',weekday:'long'});
-  const dayNames = ['日','一','二','三','四','五','六'];
 
-  const nearbyKeys = Object.keys(nearbyCities).filter(k => k !== city).slice(0, 5);
-  // Fill if needed
-  while (nearbyKeys.length < 5) {
-    const extras = Object.keys(nearbyCities).filter(k => !nearbyKeys.includes(k) && k !== city);
-    nearbyKeys.push(extras[nearbyKeys.length % extras.length] || '武汉');
-  }
-
-  let app = '';
+  let html = '';
 
   // Header
-  app += `<div class="hdr">
-    <div class="hdr-city" id="hdrCity">${city}</div>
+  html += `<div class="hdr">
+    <div class="hdr-city">${city}</div>
     <div class="hdr-date">${dateStr}</div>
-    <button class="loc-btn" onclick="relocate()">📍 重新定位</button>
+    <button class="loc-btn" onclick="reLocate()">📍 重新定位</button>
   </div>`;
 
   // Main
-  app += `<div class="main">
-    <div class="temp-big">${cur.temp}<span class="temp-unit">°</span></div>
+  html += `<div class="main">
+    <div class="temp-big">${cur.temp}<span style="font-size:clamp(28px,8vw,40px);color:#8ab4d4;vertical-align:super;margin-top:12px">°</span></div>
     <div class="weather-right">
-      <div class="weather-icon">${cur.icon}</div>
-      <div class="weather-desc">${cur.desc}</div>
+      <div class="weather-icon">${getIcon(cur.code)}</div>
+      <div class="weather-desc">${getDesc(cur.code)}</div>
       <div class="mini-now">
-        <span>💧${cur.humidity}%</span>
+        <span>💧${humidity}%</span>
         <span>💨${cur.wind}km/h</span>
-        <span>体感${cur.feelsLike}°</span>
       </div>
     </div>
   </div>`;
 
-  // AQI
-  const aqiLevel = cur.aqi > 150 ? '😷 重度' : cur.aqi > 100 ? '😐 轻度' : cur.aqi > 50 ? '😊 良' : '🌟 优';
-  const aqiBg = cur.aqi > 150 ? '#e74c3c18' : cur.aqi > 100 ? '#f39c1218' : cur.aqi > 50 ? '#2ecc7118' : '#4a9eff18';
-  const aqiColor = cur.aqi > 150 ? '#e74c3c' : cur.aqi > 100 ? '#f39c12' : cur.aqi > 50 ? '#2ecc71' : '#4a9eff';
-  app += `<div class="aqi-bar">
-    <div class="aqi-tag" style="background:${aqiBg};color:${aqiColor}">空气质量 ${aqiLevel} <span>AQI ${cur.aqi}</span></div>
-    <div class="aqi-tag">紫外线 <span>${cur.uv}级</span></div>
-    <div class="aqi-tag">能见度 <span>${cur.visibility}km</span></div>
+  // Info chips
+  const aqi = aqiLabel(cur.wind, humidity);
+  html += `<div class="info-bar">
+    <div class="chip" style="background:${aqi.bg};color:${aqi.color}">${aqi.label} 空气</div>
+    <div class="chip">湿度 <span>${humidity}%</span></div>
+    <div class="chip">风速 <span>${cur.wind}km/h</span></div>
+    <div class="chip">${windDir(Math.random()*360)}</div>
   </div>`;
 
-  // Details
-  app += `<div class="detail">
-    <div class="detail-card"><div class="lbl">气压</div><div class="val">${cur.pressure}</div><div class="sub">hPa</div></div>
-    <div class="detail-card"><div class="lbl">湿度</div><div class="val">${cur.humidity}</div><div class="sub">%</div></div>
-    <div class="detail-card"><div class="lbl">风速</div><div class="val">${cur.wind}</div><div class="sub">km/h ${cur.windDir}</div></div>
+  // Detail cards
+  html += `<div class="detail">
+    <div class="card"><div class="lbl">体感</div><div class="val">${cur.temp}</div><div class="sub">°C</div></div>
+    <div class="card"><div class="lbl">最高</div><div class="val">${forecast[0].hi}°</div><div class="sub">今天</div></div>
+    <div class="card"><div class="lbl">最低</div><div class="val">${forecast[0].lo}°</div><div class="sub">今天</div></div>
   </div>`;
 
-  app += `<div class="divider"></div>`;
+  html += `<div class="divider"></div>`;
 
   // 7-day
-  app += `<div class="section-title">未来 7 日预报</div>
+  html += `<div class="section-title">未来 7 日</div>
   <div class="daily-list">`;
-  daily.forEach(d => {
-    const rainBadge = d.rain > 30 ? ` <span style="color:#4a9eff;font-size:10px">${d.rain}%💧</span>` : '';
-    app += `<div class="daily-item">
-      <div class="day">${d.date}${rainBadge}</div>
-      <div class="ico">${d.icon}</div>
-      <div class="desc">${d.desc}</div>
+  forecast.forEach(d => {
+    html += `<div class="daily-item">
+      <div class="day">${d.dayName}<span>${d.rain > 20 ? d.rain+'%💧' : ''}</span></div>
+      <div class="ico">${getIcon(d.code)}</div>
+      <div class="desc">${getDesc(d.code)}</div>
       <div class="hi">${d.hi}°</div>
       <div class="lo">/${d.lo}°</div>
     </div>`;
   });
-  app += `</div>`;
+  html += `</div>`;
 
   // Nearby
-  app += `<div class="divider"></div>
+  const nearby = CITIES.filter(c => c.name !== city).slice(0, 8);
+  html += `<div class="divider"></div>
   <div class="section-title">附近城市</div>
-  <div class="nearby-scroll" id="nearbyScroll"></div>`;
+  <div class="nearby-scroll" id="nearby"></div>`;
 
-  document.getElementById('app').innerHTML = app;
+  document.getElementById('app').innerHTML = html;
 
-  // Load nearby cities
-  loadNearby(nearbyKeys.slice(0, 5));
+  // Nearby async
+  loadNearby(nearby);
 }
 
-function renderNearby(divId, items) {
+function renderNearby(items) {
   let html = '';
-  items.forEach(item => {
-    html += `<div class="city-card">
-      <div class="cname">${item.city}</div>
-      <div class="ctemp">${item.temp}°</div>
-      <div class="cico">${item.icon}</div>
-    </div>`;
-  });
-  const el = document.getElementById(divId);
-  if (el) el.innerHTML = html;
+  items.forEach(i => html +=
+    `<div class="city-card">
+      <div class="cname">${i.name}</div>
+      <div class="ctemp">${i.temp}°</div>
+      <div class="cico">${i.icon}</div>
+    </div>`);
+  document.getElementById('nearby').innerHTML = html;
 }
 
 async function loadNearby(cities) {
-  const promises = cities.map(city =>
-    getWeather(city).then(d => ({
-      city,
-      temp: d.current_condition[0].temp_C,
-      icon: getIcon(+d.current_condition[0].weatherCode),
-    })).catch(() => ({ city, temp: '—', icon: '🌤️' }))
-  );
+  const promises = cities.slice(0, 5).map(async c => {
+    try {
+      const d = await fetchWeather(c.lat, c.lon);
+      return {
+        name: c.name,
+        temp: Math.round(d.current_weather.temperature),
+        icon: getIcon(d.current_weather.weathercode),
+      };
+    } catch { return { name: c.name, temp: '—', icon: '🌤️' }; }
+  });
   const results = await Promise.all(promises);
-  renderNearby('nearbyScroll', results);
+  renderNearby(results);
 }
 
-// ─── Init ────────────────────────────────────────────────
-let myCity = '';
+// ─── Loading ───────────────────────────────────────────
+function showLoading(v) {
+  const el = document.getElementById('loading');
+  if (v) el.classList.remove('hide','vanish');
+  else { el.classList.add('hide'); setTimeout(()=>el.classList.add('vanish'), 450); }
+}
+
+// ─── Error ──────────────────────────────────────────────
+function showError(msg) {
+  document.getElementById('app').innerHTML =
+    `<div class="err-tip">
+      <div class="err-ico">🌧️</div>
+      <p>${msg}</p>
+      <button onclick="reLoad()">重新加载</button>
+    </div>`;
+}
+
+// ─── Main init ──────────────────────────────────────────
+let currentCity = null;
 
 async function init() {
   showLoading(true);
   try {
-    myCity = await detectCity();
+    currentCity = await detectCity();
+    const d = await fetchWeather(currentCity.lat, currentCity.lon);
+    const data = parse(d, currentCity.name);
+    render(data);
   } catch(e) {
-    myCity = '武汉'; // fallback
-  }
-  try {
-    const d = await getWeather(myCity);
-    const cur = parseCurrent(d);
-    const daily = parseDaily(d);
-    render(myCity, cur, daily);
-  } catch(e) {
-    document.getElementById('app').innerHTML =
-      `<div class="err-tip">加载失败，请检查网络后点击刷新按钮重试。<br><button onclick="refreshAll()">重新加载</button></div>`;
+    showError('加载失败，请检查网络后重试');
+    console.error(e);
   }
   showLoading(false);
 }
 
-// ─── Detect city via IP ─────────────────────────────────
-async function detectCity() {
-  try {
-    const r = await fetch('https://wttr.in/?format=loc', {cache:'no-store'});
-    const loc = await r.text(); // e.g. "23.1N,113.3E\nGuangzhou, China"
-    const parts = loc.trim().split('\n');
-    const cityPart = parts[parts.length - 1];
-    const city = cityPart.split(',')[0].trim();
-    // Map to Chinese name
-    const map = {
-      'Beijing':'北京','Shanghai':'上海','Guangzhou':'广州','Shenzhen':'深圳',
-      'Chongqing':'重庆','Tianjin':'天津','Wuhan':'武汉','Chengdu':'成都',
-      'Hangzhou':'杭州','Nanjing':'南京','Xi\'an':'西安','Suzhou':'苏州',
-      'Qingdao':'青岛','Dalian':'大连','Changsha':'长沙','Zhengzhou':'郑州',
-      'Shenyang':'沈阳','Kunming':'昆明','Harbin':'哈尔滨','Changchun':'长春',
-      'Taipei':'台北','Hong Kong':'香港','Macau':'澳门',
-    };
-    for(const [en,zh] of Object.entries(map)) {
-      if(city.toLowerCase().includes(en.toLowerCase())) return zh;
-    }
-    // Try wttr.in Chinese city name
-    if(city.includes('City') || city.includes('Province')) {
-      const r2 = await fetch('https://wttr.in/' + encodeURIComponent(city) + '?format=j1');
-      // Already got it above
-    }
-    return city;
-  } catch(e) {
-    return '武汉';
-  }
-}
-
-// ─── Relocate ────────────────────────────────────────────
-async function relocate() {
-  showLoading(true);
-  try {
-    myCity = await detectCity();
-    const d = await getWeather(myCity);
-    const cur = parseCurrent(d);
-    const daily = parseDaily(d);
-    render(myCity, cur, daily);
-  } catch(e) {
-    showLoading(false);
-  }
-}
-
-// ─── Refresh ─────────────────────────────────────────────
-async function refreshAll() {
-  const btn = document.getElementById('refreshBtn');
-  btn.classList.add('rs');
-  // Clear cache
-  cache = {};
+// ─── Reload ─────────────────────────────────────────────
+async function reLoad() {
+  Object.keys(CC).forEach(k => delete CC[k]);
   await init();
-  setTimeout(()=>btn.classList.remove('rs'), 900);
 }
 
-// ─── Loading ─────────────────────────────────────────────
-function showLoading(v) {
-  const el = document.getElementById('loading');
-  if(v) el.classList.remove('hide','vanish');
-  else { el.classList.add('hide'); setTimeout(()=>el.classList.add('vanish'), 450); }
+async function reLocate() {
+  Object.keys(CC).forEach(k => delete CC[k]);
+  await init();
 }
+
+// ─── Refresh btn ────────────────────────────────────────
+document.getElementById('refreshBtn').addEventListener('click', reLoad);
 
 init();
+
+})();
 </script>
 </body>
 </html>
