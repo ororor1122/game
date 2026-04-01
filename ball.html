@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>陀螺仪迷宫 - 倾斜控制小球</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0a0f1e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: system-ui, 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #1a1f2e;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        canvas {
+            background: #2d2f3e;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: block;
+            margin: 0 auto;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .info-card {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 40px;
+            padding: 8px 18px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,215,0,0.4);
+            text-align: center;
+        }
+
+        .info-card span {
+            color: #ffd966;
+            font-size: 1.2rem;
+        }
+
+        .angle-indicator {
+            background: rgba(0,0,0,0.6);
+            border-radius: 40px;
+            padding: 6px 15px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 25px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            z-index: 30;
+            pointer-events: auto;
+        }
+
+        button {
+            background: #ff9800;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #1e1e2a;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+            font-family: inherit;
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        .permission-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            gap: 20px;
+            backdrop-filter: blur(12px);
+        }
+
+        .permission-mask button {
+            background: #4caf50;
+            color: white;
+            padding: 12px 28px;
+            font-size: 1.2rem;
+        }
+
+        .message {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            padding: 6px 14px;
+            border-radius: 30px;
+            color: #ffaa88;
+            font-size: 0.8rem;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        @media (max-width: 600px) {
+            .info-card { font-size: 0.7rem; padding: 5px 12px; }
+            .angle-indicator { font-size: 0.7rem; padding: 4px 10px; }
+            button { padding: 8px 16px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <canvas id="mazeCanvas" width="500" height="500"></canvas>
+    <div class="ui-panel">
+        <div class="info-card">🎯 目标: <span id="goalStatus">🔴 未达</span></div>
+        <div class="info-card">📐 倾斜角 <span id="angleValue">0°</span></div>
+    </div>
+    <div class="controls">
+        <button id="resetBtn">🔄 重置小球</button>
+        <button id="calibrateBtn">⚡ 校准水平</button>
+    </div>
+    <div class="message" id="messageBox">⚡ 请授权陀螺仪，倾斜手机控制小球</div>
+    <div id="permissionMask" class="permission-mask">
+        <div style="font-size: 1.8rem;">🎮 陀螺仪迷宫</div>
+        <div style="font-size: 1rem; max-width: 80%;">倾斜手机控制小球滚动<br>避开红色陷阱，到达绿色终点</div>
+        <button id="enableGyroBtn">🎯 授权陀螺仪并开始</button>
+        <div style="font-size: 0.7rem; margin-top: 10px;">⚠️ iOS需点击按钮授权，Android自动开启</div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- 迷宫定义 ----------
+        // 7x7 迷宫 (0:空地, 1:墙壁, 2:陷阱, 3:终点)
+        const MAZE = [
+            [1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,1],
+            [1,0,1,1,0,0,1],
+            [1,0,2,0,0,3,1],
+            [1,0,1,1,1,0,1],
+            [1,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1]
+        ];
+        const CELL_SIZE = 70;    // 格子大小(px) 500/7 ≈71.4 取整70，canvas 490x490，留边距
+        const CANVAS_SIZE = 490; // 7*70=490
+        const BALL_RADIUS = 20;
+        
+        // 起点坐标 (行列)
+        const START_ROW = 1;
+        const START_COL = 1;
+        // 终点坐标 (行列)
+        let goalRow = -1, goalCol = -1;
+        // 陷阱坐标数组
+        let traps = [];
+        
+        // 解析迷宫，记录终点和陷阱
+        for(let r=0; r<MAZE.length; r++){
+            for(let c=0; c<MAZE[0].length; c++){
+                if(MAZE[r][c] === 3){
+                    goalRow = r;
+                    goalCol = c;
+                }
+                if(MAZE[r][c] === 2){
+                    traps.push({row: r, col: c});
+                }
+            }
+        }
+        
+        // canvas元素
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+        
+        // 小球物理变量 (坐标基于canvas坐标系)
+        let ballX = START_COL * CELL_SIZE + CELL_SIZE/2;
+        let ballY = START_ROW * CELL_SIZE + CELL_SIZE/2;
+        let vx = 0, vy = 0;
+        
+        // 物理参数
+        const GRAVITY_FORCE = 0.45;    // 加速度系数
+        const DAMPING = 0.985;          // 阻尼系数
+        const MAX_SPEED = 7.0;
+        
+        // 游戏状态
+        let gameActive = true;      // 游戏进行中 (胜利后停用物理)
+        let reachedGoal = false;
+        
+        // 陀螺仪数据
+        let gamma = 0;      // 左右倾斜 (-90~90)
+        let beta = 0;       // 前后倾斜 (-180~180)
+        let gammaOffset = 0;
+        let betaOffset = 0;
+        let gyroAvailable = false;
+        let calibratePending = false;
+        
+        // UI元素
+        const goalStatusSpan = document.getElementById('goalStatus');
+        const angleValueSpan = document.getElementById('angleValue');
+        const messageBox = document.getElementById('messageBox');
+        const permissionMask = document.getElementById('permissionMask');
+        const enableGyroBtn = document.getElementById('enableGyroBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const calibrateBtn = document.getElementById('calibrateBtn');
+        
+        // ---------- 辅助函数 ----------
+        // 将行列转换为世界坐标中心点
+        function getCellCenter(row, col) {
+            return { x: col * CELL_SIZE + CELL_SIZE/2, y: row * CELL_SIZE + CELL_SIZE/2 };
+        }
+        
+        // 重置小球位置和速度
+        function resetBall() {
+            ballX = START_COL * CELL_SIZE + CELL_SIZE/2;
+            ballY = START_ROW * CELL_SIZE + CELL_SIZE/2;
+            vx = 0;
+            vy = 0;
+            gameActive = true;
+            reachedGoal = false;
+            goalStatusSpan.innerText = "🔴 未达";
+            goalStatusSpan.style.color = "#ffaa66";
+            messageBox.innerText = "🏃 小球已重置，继续挑战！";
+            setTimeout(() => {
+                if(messageBox.innerText === "🏃 小球已重置，继续挑战！") messageBox.innerText = "🎮 倾斜手机控制小球";
+            }, 2000);
+        }
+        
+        // 检查小球所在格子类型并触发事件
+        function checkCellCollision() {
+            // 计算小球中心所在格子
+            const col = Math.floor(ballX / CELL_SIZE);
+            const row = Math.floor(ballY / CELL_SIZE);
+            if(row < 0 || row >= MAZE.length || col < 0 || col >= MAZE[0].length) return;
+            const cellType = MAZE[row][col];
+            if(cellType === 2) {  // 陷阱
+                messageBox.innerText = "💀 掉进陷阱！重新开始...";
+                resetBall();
+                // 震动反馈（如果支持）
+                if(navigator.vibrate) navigator.vibrate(200);
+                setTimeout(() => {
+                    if(messageBox.innerText === "💀 掉进陷阱！重新开始...") messageBox.innerText = "🎮 倾斜手机控制小球";
+                }, 1500);
+                return;
+            }
+            if(cellType === 3 && !reachedGoal && gameActive) {  // 终点
+                gameActive = false;
+                reachedGoal = true;
+                goalStatusSpan.innerText = "⭐ 胜利! ⭐";
+                goalStatusSpan.style.color = "#ffd966";
+                messageBox.innerText = "🎉 恭喜到达终点！点击重置继续挑战 🎉";
+                if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                // 停止小球运动
+                vx = 0;
+                vy = 0;
+            }
+        }
+        
+        // 圆形与矩形碰撞检测并响应（墙壁）
+        function handleWallCollision() {
+            // 小球边界参数
+            const left = ballX - BALL_RADIUS;
+            const right = ballX + BALL_RADIUS;
+            const top = ballY - BALL_RADIUS;
+            const bottom = ballY + BALL_RADIUS;
+            
+            // 计算涉及到的格子范围
+            const startCol = Math.max(0, Math.floor(left / CELL_SIZE));
+            const endCol = Math.min(MAZE[0].length-1, Math.floor(right / CELL_SIZE));
+            const startRow = Math.max(0, Math.floor(top / CELL_SIZE));
+            const endRow = Math.min(MAZE.length-1, Math.floor(bottom / CELL_SIZE));
+            
+            for(let row = startRow; row <= endRow; row++) {
+                for(let col = startCol; col <= endCol; col++) {
+                    if(MAZE[row][col] === 1) { // 墙壁
+                        // 矩形边界
+                        const rectLeft = col * CELL_SIZE;
+                        const rectRight = rectLeft + CELL_SIZE;
+                        const rectTop = row * CELL_SIZE;
+                        const rectBottom = rectTop + CELL_SIZE;
+                        
+                        // 最近点距离
+                        const closestX = Math.max(rectLeft, Math.min(ballX, rectRight));
+                        const closestY = Math.max(rectTop, Math.min(ballY, rectBottom));
+                        const dx = ballX - closestX;
+                        const dy = ballY - closestY;
+                        const dist = Math.hypot(dx, dy);
+                        if(dist < BALL_RADIUS) {
+                            // 碰撞响应: 推离
+                            const angle = Math.atan2(dy, dx);
+                            const overlap = BALL_RADIUS - dist;
+                            const moveX = Math.cos(angle) * overlap;
+                            const moveY = Math.sin(angle) * overlap;
+                            ballX += moveX;
+                            ballY += moveY;
+                            
+                            // 弹性碰撞: 改变速度（法向分量反向）
+                            const normalX = dx / dist;
+                            const normalY = dy / dist;
+                            const vdotn = vx * normalX + vy * normalY;
+                            if(vdotn < 0) {
+                                const restitution = 0.6;
+                                const newVdotn = -vdotn * restitution;
+                                vx += (newVdotn - vdotn) * normalX;
+                                vy += (newVdotn - vdotn) * normalY;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 边界碰撞 (画布边缘)
+        function handleBoundary() {
+            const leftBound = BALL_RADIUS;
+            const rightBound = CANVAS_SIZE - BALL_RADIUS;
+            const topBound = BALL_RADIUS;
+            const bottomBound = CANVAS_SIZE - BALL_RADIUS;
+            
+            if(ballX < leftBound) {
+                ballX = leftBound;
+                vx = -vx * 0.5;
+            }
+            if(ballX > rightBound) {
+                ballX = rightBound;
+                vx = -vx * 0.5;
+            }
+            if(ballY < topBound) {
+                ballY = topBound;
+                vy = -vy * 0.5;
+            }
+            if(ballY > bottomBound) {
+                ballY = bottomBound;
+                vy = -vy * 0.5;
+            }
+        }
+        
+        // 物理更新 (基于陀螺仪加速度)
+        function updatePhysics() {
+            if(!gameActive || !gyroAvailable) return;
+            
+            // 计算加速度 (倾斜角度转换为加速度，限制最大倾斜±45度)
+            let gammaAdj = gamma - gammaOffset;
+            let betaAdj = beta - betaOffset;
+            // 限制有效角度范围 -40° ~ 40°，超出按边界计算
+            let gammaEff = Math.min(40, Math.max(-40, gammaAdj));
+            let betaEff = Math.min(40, Math.max(-40, betaAdj));
+            // 映射加速度: 角度越大加速度越大，符号决定方向
+            // gamma: 右倾为正 => 向右加速度为正
+            // beta: 前倾(屏幕朝下)为正 => 向下加速度为正
+            let ax = (gammaEff / 40) * GRAVITY_FORCE;
+            let ay = (betaEff / 40) * GRAVITY_FORCE;
+            
+            // 欧拉积分
+            vx += ax;
+            vy += ay;
+            // 阻尼
+            vx *= DAMPING;
+            vy *= DAMPING;
+            // 限制最大速度
+            let spd = Math.hypot(vx, vy);
+            if(spd > MAX_SPEED) {
+                vx = vx / spd * MAX_SPEED;
+                vy = vy / spd * MAX_SPEED;
+            }
+            
+            ballX += vx;
+            ballY += vy;
+            
+            // 碰撞处理顺序: 边界 -> 墙壁(多次迭代确保稳定)
+            handleBoundary();
+            for(let iter=0; iter<3; iter++) {
+                handleWallCollision();
+            }
+            // 确保小球不超出边界（二次保险）
+            ballX = Math.min(Math.max(ballX, BALL_RADIUS), CANVAS_SIZE - BALL_RADIUS);
+            ballY = Math.min(Math.max(ballY, BALL_RADIUS), CANVAS_SIZE - BALL_RADIUS);
+            
+            // 检查终点/陷阱
+            checkCellCollision();
+        }
+        
+        // ---------- 绘制迷宫 ----------
+        function drawMaze() {
+            for(let row=0; row<MAZE.length; row++) {
+                for(let col=0; col<MAZE[0].length; col++) {
+                    let x = col * CELL_SIZE;
+                    let y = row * CELL_SIZE;
+                    switch(MAZE[row][col]) {
+                        case 1: // 墙壁
+                            ctx.fillStyle = "#2c3e4e";
+                            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                            ctx.fillStyle = "#1e2a32";
+                            ctx.fillRect(x+2, y+2, CELL_SIZE-4, CELL_SIZE-4);
+                            break;
+                        case 2: // 陷阱
+                            ctx.fillStyle = "#a12a2a";
+                            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                            ctx.fillStyle = "#8b0000";
+                            ctx.beginPath();
+                            ctx.moveTo(x+CELL_SIZE/2, y+10);
+                            ctx.lineTo(x+CELL_SIZE-10, y+CELL_SIZE-10);
+                            ctx.lineTo(x+10, y+CELL_SIZE-10);
+                            ctx.fill();
+                            break;
+                        case 3: // 终点
+                            ctx.fillStyle = "#2e7d32";
+                            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                            ctx.fillStyle = "#ffd966";
+                            ctx.font = `${CELL_SIZE*0.5}px monospace`;
+                            ctx.textAlign = "center";
+                            ctx.textBaseline = "middle";
+                            ctx.fillText("★", x+CELL_SIZE/2, y+CELL_SIZE/2);
+                            break;
+                        default: // 空地
+                            ctx.fillStyle = "#3a3f4e";
+                            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                            ctx.fillStyle = "#4a4f62";
+                            ctx.fillRect(x+1, y+1, CELL_SIZE-2, CELL_SIZE-2);
+                            break;
+                    }
+                }
+            }
+            
+            // 绘制网格线
+            ctx.beginPath();
+            ctx.strokeStyle = "#222222";
+            ctx.lineWidth = 1;
+            for(let i=0; i<=MAZE.length; i++) {
+                ctx.moveTo(0, i*CELL_SIZE);
+                ctx.lineTo(CANVAS_SIZE, i*CELL_SIZE);
+                ctx.moveTo(i*CELL_SIZE, 0);
+                ctx.lineTo(i*CELL_SIZE, CANVAS_SIZE);
+                ctx.stroke();
+            }
+        }
+        
+        // 绘制小球
+        function drawBall() {
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, BALL_RADIUS, 0, Math.PI*2);
+            ctx.fillStyle = "#ffcc44";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ballX-3, ballY-3, 5, 0, Math.PI*2);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ballX-4, ballY-4, 2, 0, Math.PI*2);
+            ctx.fillStyle = "#111";
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        
+        // 绘制倾斜指示器 (简易)
+        function drawTiltIndicator() {
+            if(!gyroAvailable) return;
+            let gammaAdj = gamma - gammaOffset;
+            let betaAdj = beta - betaOffset;
+            let gammaNorm = Math.min(40, Math.max(-40, gammaAdj)) / 40;
+            let betaNorm = Math.min(40, Math.max(-40, betaAdj)) / 40;
+            let centerX = CANVAS_SIZE - 30;
+            let centerY = 30;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 18, 0, 2*Math.PI);
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + gammaNorm*15, centerY + betaNorm*15);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#ffaa66";
+            ctx.stroke();
+            ctx.fillStyle = "#ffaa66";
+            ctx.beginPath();
+            ctx.arc(centerX + gammaNorm*15, centerY + betaNorm*15, 4, 0, 2*Math.PI);
+            ctx.fill();
+        }
+        
+        // 渲染循环
+        function render() {
+            drawMaze();
+            drawBall();
+            drawTiltIndicator();
+            // 更新UI角度显示
+            if(gyroAvailable) {
+                let gammaShow = (gamma - gammaOffset).toFixed(1);
+                let betaShow = (beta - betaOffset).toFixed(1);
+                angleValueSpan.innerText = `${gammaShow}° / ${betaShow}°`;
+            } else {
+                angleValueSpan.innerText = "等待授权";
+            }
+            requestAnimationFrame(render);
+        }
+        
+        // 游戏循环 (物理更新)
+        let lastTimestamp = 0;
+        function gameLoop() {
+            updatePhysics();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // ---------- 陀螺仪校准 ----------
+        function calibrateGyro() {
+            if(!gyroAvailable) return;
+            gammaOffset = gamma;
+            betaOffset = beta;
+            messageBox.innerText = "⚡ 水平已校准，倾斜手机试试看";
+            setTimeout(() => {
+                if(messageBox.innerText === "⚡ 水平已校准，倾斜手机试试看") messageBox.innerText = "🎮 倾斜手机控制小球";
+            }, 2000);
+        }
+        
+        // ---------- 陀螺仪监听与权限处理 (兼容iOS) ----------
+        function initGyro() {
+            // 先检查是否支持 DeviceOrientationEvent
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS 需要显式授权
+                enableGyroBtn.onclick = async () => {
+                    try {
+                        const permissionState = await DeviceOrientationEvent.requestPermission();
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            gyroAvailable = true;
+                            permissionMask.style.display = 'none';
+                            messageBox.innerText = "🎮 陀螺仪已授权！倾斜手机控制小球";
+                            calibrateGyro(); // 初次自动校准
+                        } else {
+                            messageBox.innerText = "⚠️ 需要授权才能使用陀螺仪";
+                        }
+                    } catch (err) {
+                        console.error("iOS授权失败", err);
+                        messageBox.innerText = "❌ 陀螺仪授权失败，请检查设置";
+                    }
+                };
+            } else {
+                // Android 或其他可直接监听
+                window.addEventListener('deviceorientation', handleOrientation);
+                gyroAvailable = true;
+                permissionMask.style.display = 'none';
+                messageBox.innerText = "🎮 陀螺仪已激活！倾斜手机控制小球";
+                calibrateGyro(); // 自动校准
+                enableGyroBtn.onclick = () => {}; // 无作用
+            }
+        }
+        
+        function handleOrientation(event) {
+            // gamma: 左右倾斜, beta: 前后倾斜, alpha: 方向（不用）
+            gamma = event.gamma || 0;
+            beta = event.beta || 0;
+            // 限制范围避免过激
+            gamma = Math.min(45, Math.max(-45, gamma));
+            beta = Math.min(45, Math.max(-45, beta));
+        }
+        
+        // 重置游戏 (UI+物理)
+        function resetGame() {
+            resetBall();
+            // 可选重置速度归零已在resetBall中做
+            if(navigator.vibrate) navigator.vibrate(50);
+            messageBox.innerText = "🔄 游戏已重置，继续挑战吧！";
+            setTimeout(() => {
+                if(messageBox.innerText === "🔄 游戏已重置，继续挑战吧！") messageBox.innerText = "🎮 倾斜手机控制小球";
+            }, 2000);
+        }
+        
+        // 手动重置按钮
+        resetBtn.addEventListener('click', () => {
+            if(!gyroAvailable) {
+                messageBox.innerText = "⏳ 请先授权陀螺仪";
+                return;
+            }
+            resetGame();
+        });
+        
+        calibrateBtn.addEventListener('click', () => {
+            if(!gyroAvailable) {
+                messageBox.innerText = "⏳ 陀螺仪未授权，请先授权";
+                return;
+            }
+            calibrateGyro();
+        });
+        
+        // 启动渲染和游戏循环
+        render();
+        gameLoop();
+        
+        // 初始化陀螺仪 (等待用户点击授权)
+        initGyro();
+        
+        // 如果用户没有点击授权，显示遮罩；对于Android，上面的initGyro会自动授权并关闭遮罩
+        // 确保非iOS情况下也能关闭遮罩
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission !== 'function') {
+            // Android 自动授权后关闭遮罩
+            setTimeout(() => {
+                if(gyroAvailable) permissionMask.style.display = 'none';
+            }, 500);
+        }
+        
+        // 额外：如果用户点击canvas区域或者误触，不干扰
+    })();
+</script>
+</body>
+</html>
