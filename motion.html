@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>体感接球 - 镜像模式 | 前置摄像头游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0a0f1e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: system-ui, 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #1a1f2e;
+        }
+
+        /* UI层 */
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 20px;
+            z-index: 20;
+            pointer-events: none;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .score-box, .lives-box {
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(8px);
+            padding: 8px 18px;
+            border-radius: 40px;
+            color: white;
+            font-size: 1.4rem;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255,255,255,0.3);
+            font-family: monospace;
+        }
+
+        .score-box span, .lives-box span {
+            color: #ffd966;
+            font-weight: bold;
+            font-size: 1.8rem;
+            margin-left: 8px;
+        }
+
+        .instruction {
+            position: absolute;
+            bottom: 25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(5px);
+            color: #ddd;
+            padding: 8px 15px;
+            font-size: 0.85rem;
+            border-radius: 30px;
+            width: fit-content;
+            margin: 0 auto;
+            z-index: 20;
+            pointer-events: none;
+            font-weight: 500;
+            border: 1px solid rgba(255,215,0,0.4);
+        }
+
+        .instruction i {
+            font-style: normal;
+            display: inline-block;
+            animation: pulse 1.2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; transform: scale(1);}
+            100% { opacity: 1; transform: scale(1.05);}
+        }
+
+        .restart-btn {
+            position: absolute;
+            bottom: 90px;
+            right: 20px;
+            background: #ff9800;
+            border: none;
+            color: #1e1e2a;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1rem;
+            z-index: 25;
+            pointer-events: auto;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transition: 0.2s;
+            font-family: inherit;
+        }
+
+        .restart-btn:active {
+            transform: scale(0.96);
+            background: #e68900;
+        }
+
+        .mirror-badge {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #aaa;
+            z-index: 25;
+            pointer-events: none;
+            font-family: monospace;
+        }
+
+        @media (max-width: 600px) {
+            .score-box, .lives-box { padding: 5px 12px; font-size: 1rem; }
+            .score-box span, .lives-box span { font-size: 1.4rem; }
+            .instruction { font-size: 0.7rem; bottom: 15px; }
+        }
+
+        /* 权限遮罩 */
+        .permission-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            gap: 20px;
+            backdrop-filter: blur(12px);
+        }
+
+        .permission-mask button {
+            background: #4caf50;
+            border: none;
+            padding: 12px 28px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="gameContainer">
+    <canvas id="gameCanvas" width="800" height="1200"></canvas>
+    <div class="ui-overlay">
+        <div class="score-box">🏆 得分 <span id="scoreValue">0</span></div>
+        <div class="lives-box">❤️ 生命 <span id="livesValue">3</span></div>
+    </div>
+    <div class="instruction">
+        🎥 镜像模式 | 移动头部或手掌 → 挡板同向移动 &nbsp;&nbsp;|&nbsp;&nbsp; 接住小球得分！
+    </div>
+    <button class="restart-btn" id="restartButton">🔄 重开游戏</button>
+    <div class="mirror-badge">🪞 镜像控制 | 左右自然跟随</div>
+    <div id="permissionPanel" class="permission-mask">
+        <div style="font-size: 1.8rem;">📷 需要摄像头权限</div>
+        <div style="font-size: 1rem; max-width: 80%;">使用前置摄像头进行体感控制<br>请点击允许授权</div>
+        <button id="enableCameraBtn">🎥 开启前置摄像头</button>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- DOM 元素 ----------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('scoreValue');
+        const livesSpan = document.getElementById('livesValue');
+        const restartBtn = document.getElementById('restartButton');
+        const permissionPanel = document.getElementById('permissionPanel');
+        const enableBtn = document.getElementById('enableCameraBtn');
+
+        // ---------- 游戏参数 ----------
+        let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        
+        // 球体属性
+        let ball = {
+            x: 0,
+            y: 0,
+            radius: 14,
+            speedY: 3.8,
+            speedX: 0.6,
+            color: '#ffaa44'
+        };
+        
+        // 挡板属性
+        let paddle = {
+            width: 100,
+            height: 20,
+            x: 0,
+            y: 0,
+            color: '#3b82f6'
+        };
+        
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 1200;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+        
+        paddle.y = GAME_HEIGHT - paddle.height - 30;
+        
+        // 运动检测相关变量
+        let video = null;
+        let processingActive = false;
+        let stream = null;
+        let prevGray = null;
+        let motionX = GAME_WIDTH / 2;      // 镜像后的运动中心 (游戏坐标)
+        let targetPaddleX = GAME_WIDTH/2 - paddle.width/2;
+        
+        const MOTION_SMOOTHING = 0.4;
+        const MOTION_THRESHOLD = 28;
+        const MIN_MOTION_PIXELS = 25;
+        
+        let offCanvas = document.createElement('canvas');
+        let offCtx = offCanvas.getContext('2d');
+        const PROCESS_W = 60;
+        let PROCESS_H = 0;
+        
+        let animationId = null;
+        
+        // ---------- 游戏重置 ----------
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            gameRunning = true;
+            updateUI();
+            resetBallPosition();
+            motionX = GAME_WIDTH/2;
+            targetPaddleX = GAME_WIDTH/2 - paddle.width/2;
+            updatePaddleFromMotion();
+        }
+        
+        function resetBallPosition() {
+            ball.x = Math.random() * (GAME_WIDTH - 2 * ball.radius) + ball.radius;
+            ball.y = ball.radius + 20;
+            ball.speedX = (Math.random() - 0.5) * 1.2;
+            ball.speedY = 3.5 + Math.random() * 1.5;
+        }
+        
+        function updateUI() {
+            scoreSpan.innerText = score;
+            livesSpan.innerText = lives;
+        }
+        
+        function loseLife() {
+            if (!gameRunning) return;
+            lives--;
+            updateUI();
+            if (lives <= 0) {
+                gameRunning = false;
+                lives = 0;
+                updateUI();
+            } else {
+                resetBallPosition();
+            }
+        }
+        
+        function addScore(points = 1) {
+            if (!gameRunning) return;
+            score += points;
+            updateUI();
+            if (score % 5 === 0 && ball.speedY < 8.5) {
+                ball.speedY += 0.25;
+            }
+            resetBallPosition();
+        }
+        
+        function updatePaddleFromMotion() {
+            let paddleCenter = Math.min(Math.max(motionX, paddle.width/2), GAME_WIDTH - paddle.width/2);
+            let newX = paddleCenter - paddle.width/2;
+            targetPaddleX = Math.min(Math.max(newX, 0), GAME_WIDTH - paddle.width);
+            paddle.x = paddle.x * 0.85 + targetPaddleX * 0.15;
+            paddle.x = Math.min(Math.max(paddle.x, 0), GAME_WIDTH - paddle.width);
+        }
+        
+        // ---------- 游戏逻辑 ----------
+        function updateGame() {
+            if (!gameRunning) return;
+            
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+            
+            if (ball.x - ball.radius <= 0) {
+                ball.x = ball.radius;
+                ball.speedX = -ball.speedX;
+            }
+            if (ball.x + ball.radius >= GAME_WIDTH) {
+                ball.x = GAME_WIDTH - ball.radius;
+                ball.speedX = -ball.speedX;
+            }
+            if (ball.y - ball.radius <= 0) {
+                ball.y = ball.radius;
+                ball.speedY = -ball.speedY;
+                ball.speedY = Math.abs(ball.speedY);
+            }
+            
+            let ballLeft = ball.x - ball.radius;
+            let ballRight = ball.x + ball.radius;
+            let ballTop = ball.y - ball.radius;
+            let ballBottom = ball.y + ball.radius;
+            let paddleLeft = paddle.x;
+            let paddleRight = paddle.x + paddle.width;
+            let paddleTop = paddle.y;
+            let paddleBottom = paddle.y + paddle.height;
+            
+            if (ballBottom >= paddleTop && ballTop <= paddleBottom && ballRight >= paddleLeft && ballLeft <= paddleRight) {
+                let collidePoint = ball.x - (paddle.x + paddle.width/2);
+                collidePoint = Math.min(Math.max(collidePoint, -paddle.width/2), paddle.width/2);
+                let angle = collidePoint / (paddle.width/2) * 0.8;
+                let speed = Math.hypot(ball.speedX, ball.speedY);
+                let direction = Math.atan2(ball.speedY, ball.speedX);
+                direction = -direction + angle;
+                ball.speedX = Math.sin(direction) * speed;
+                ball.speedY = -Math.cos(direction) * speed;
+                ball.speedY = -Math.abs(ball.speedY);
+                if (Math.abs(ball.speedY) < 2.5) ball.speedY = -3.2;
+                ball.y = paddleTop - ball.radius;
+                addScore(1);
+            }
+            
+            if (ball.y + ball.radius >= GAME_HEIGHT) {
+                loseLife();
+                resetBallPosition();
+            }
+            
+            ball.x = Math.min(Math.max(ball.x, ball.radius), GAME_WIDTH - ball.radius);
+        }
+        
+        // ---------- 运动检测核心（镜像翻转）----------
+        function computeMotionCenter(videoElement) {
+            if (!videoElement || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return null;
+            
+            const vw = videoElement.videoWidth;
+            const vh = videoElement.videoHeight;
+            PROCESS_H = Math.floor((PROCESS_W / vw) * vh);
+            if (PROCESS_H < 10) PROCESS_H = 40;
+            offCanvas.width = PROCESS_W;
+            offCanvas.height = PROCESS_H;
+            
+            offCtx.drawImage(videoElement, 0, 0, vw, vh, 0, 0, PROCESS_W, PROCESS_H);
+            let imgData = offCtx.getImageData(0, 0, PROCESS_W, PROCESS_H);
+            let pixels = imgData.data;
+            let len = PROCESS_W * PROCESS_H;
+            
+            let curGray = new Uint8ClampedArray(len);
+            for (let i = 0; i < len; i++) {
+                let r = pixels[i*4];
+                let g = pixels[i*4+1];
+                let b = pixels[i*4+2];
+                curGray[i] = (r + g + b) / 3;
+            }
+            
+            if (prevGray === null) {
+                prevGray = curGray;
+                return null;
+            }
+            
+            let motionSumX = 0;
+            let motionPixelCount = 0;
+            for (let i = 0; i < len; i++) {
+                let diff = Math.abs(curGray[i] - prevGray[i]);
+                if (diff > MOTION_THRESHOLD) {
+                    let xPixel = i % PROCESS_W;
+                    motionSumX += xPixel;
+                    motionPixelCount++;
+                }
+            }
+            
+            prevGray = curGray;
+            
+            if (motionPixelCount < MIN_MOTION_PIXELS) return null;
+            
+            let centroidX_scaled = motionSumX / motionPixelCount;
+            let mappedX = (centroidX_scaled / PROCESS_W) * GAME_WIDTH;
+            mappedX = Math.min(Math.max(mappedX, 20), GAME_WIDTH - 20);
+            
+            // 【关键修改】镜像翻转: 因为摄像头原始画面左右颠倒，为了体感“同向”，将检测到的X坐标镜像
+            let mirroredX = GAME_WIDTH - mappedX;
+            return mirroredX;
+        }
+        
+        function updateMotionControl() {
+            if (!video || video.readyState < 2 || !processingActive) return;
+            try {
+                let rawMirroredX = computeMotionCenter(video);
+                if (rawMirroredX !== null) {
+                    motionX = motionX * (1 - MOTION_SMOOTHING) + rawMirroredX * MOTION_SMOOTHING;
+                }
+                updatePaddleFromMotion();
+            } catch(e) {
+                console.warn("运动检测异常", e);
+            }
+        }
+        
+        // ---------- 绘图（摄像头背景也做镜像，保持视觉一致）----------
+        function drawMirroredVideoBackground() {
+            if (!video || video.readyState < 2 || video.videoWidth === 0) return false;
+            
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            // 计算适应canvas (cover效果)
+            const scale = Math.max(GAME_WIDTH / vw, GAME_HEIGHT / vh);
+            const drawW = vw * scale;
+            const drawH = vh * scale;
+            const offsetX = (GAME_WIDTH - drawW) / 2;
+            const offsetY = (GAME_HEIGHT - drawH) / 2;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            ctx.clip();
+            // 水平镜像绘制
+            ctx.translate(GAME_WIDTH, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, vw, vh, -offsetX - drawW, offsetY, drawW, drawH);
+            ctx.restore();
+            return true;
+        }
+        
+        function draw() {
+            // 1. 绘制摄像头背景（镜像）
+            const hasVideoBg = drawMirroredVideoBackground();
+            if (!hasVideoBg) {
+                ctx.fillStyle = '#11151f';
+                ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            }
+            
+            // 2. 半透明遮罩增强游戏元素可见度
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            // 3. 挡板
+            const grad = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x + paddle.width, paddle.y + paddle.height);
+            grad.addColorStop(0, '#3b82f6');
+            grad.addColorStop(1, '#2563eb');
+            ctx.fillStyle = grad;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "rgba(0,120,255,0.6)";
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(paddle.x + 5, paddle.y - 3, paddle.width - 10, 5);
+            
+            // 4. 球体
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#ffaa33";
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius-3, 0, Math.PI*2);
+            ctx.fillStyle = '#ffdd88';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // 5. 运动指示器（显示镜像后的位置）
+            ctx.beginPath();
+            ctx.arc(motionX, paddle.y - 10, 8, 0, 2*Math.PI);
+            ctx.fillStyle = "rgba(255,255,100,0.7)";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(motionX, paddle.y - 10, 4, 0, 2*Math.PI);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.font = "bold 14px system-ui";
+            ctx.fillStyle = "#f0f0f0";
+            ctx.shadowBlur = 2;
+            ctx.fillText("👆 运动追踪点", motionX-35, paddle.y-14);
+            
+            // 6. UI文字
+            if (!gameRunning && lives <= 0) {
+                ctx.font = "800 38px system-ui";
+                ctx.fillStyle = "#ffdd88";
+                ctx.fillText("GAME OVER", GAME_WIDTH/2-120, GAME_HEIGHT/2-50);
+                ctx.font = "18px system-ui";
+                ctx.fillStyle = "#cccccc";
+                ctx.fillText("点击「重开游戏」继续挑战", GAME_WIDTH/2-130, GAME_HEIGHT/2+20);
+            } else if (gameRunning && lives > 0) {
+                ctx.font = "12px monospace";
+                ctx.fillStyle = "#cbd5e1";
+                ctx.fillText("⚡速度等级:" + ball.speedY.toFixed(1), GAME_WIDTH-85, 45);
+            }
+            
+            ctx.strokeStyle = "#ffb347";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(5, 5, GAME_WIDTH-10, GAME_HEIGHT-10);
+        }
+        
+        // ---------- 主循环 ----------
+        function gameLoop() {
+            updateGame();
+            if (processingActive && video && video.readyState >= 2) {
+                updateMotionControl();
+            }
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // ---------- 摄像头初始化 ----------
+        async function initCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: { exact: "user" },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                };
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                if (!video) {
+                    video = document.createElement('video');
+                    video.setAttribute('playsinline', true);
+                    video.setAttribute('autoplay', true);
+                    video.muted = true;
+                }
+                video.srcObject = stream;
+                await video.play();
+                processingActive = true;
+                prevGray = null;
+                motionX = GAME_WIDTH/2;
+                targetPaddleX = GAME_WIDTH/2 - paddle.width/2;
+                paddle.x = targetPaddleX;
+                permissionPanel.style.display = 'none';
+                resetGame();
+                gameRunning = true;
+                updateUI();
+            } catch (err) {
+                console.error("摄像头启动失败", err);
+                permissionPanel.innerHTML = `<div style="font-size:1.4rem;">⚠️ 无法获取摄像头</div>
+                                              <div style="font-size:0.8rem; max-width:80%;">请确保允许摄像头权限，并使用HTTPS或本地访问<br>错误: ${err.message}</div>
+                                              <button id="enableCameraBtn">重试</button>`;
+                const retryBtn = document.getElementById('enableCameraBtn');
+                if (retryBtn) retryBtn.onclick = () => { location.reload(); };
+                processingActive = false;
+            }
+        }
+        
+        function restartGame() {
+            if (!processingActive) {
+                initCamera();
+                return;
+            }
+            resetGame();
+            motionX = GAME_WIDTH/2;
+            targetPaddleX = GAME_WIDTH/2 - paddle.width/2;
+            paddle.x = targetPaddleX;
+            prevGray = null;
+            gameRunning = true;
+            updateUI();
+        }
+        
+        // 事件绑定
+        restartBtn.addEventListener('click', () => restartGame());
+        enableBtn.addEventListener('click', () => initCamera());
+        
+        // 启动循环
+        animationId = requestAnimationFrame(gameLoop);
+        
+        // 尝试自动请求（静默，若失败保留按钮）
+        setTimeout(() => {
+            if (permissionPanel.style.display !== 'none') {
+                initCamera().catch(()=>{});
+            }
+        }, 100);
+        
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    })();
+</script>
+</body>
+</html>
