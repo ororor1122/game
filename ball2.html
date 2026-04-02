@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>平衡球 - 迷宫路径 | 5个难度关卡</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Poppins', sans-serif;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+            z-index: 10;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .panel {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 30px;
+            padding: 8px 18px;
+            color: #ffefc0;
+            font-weight: bold;
+            font-family: monospace;
+            pointer-events: auto;
+            border: 1px solid #ffaa66;
+        }
+        #level-info {
+            font-size: 1.2rem;
+        }
+        #controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #ccc;
+            pointer-events: none;
+        }
+        button {
+            background: #ffaa44;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+            pointer-events: auto;
+        }
+        button:hover {
+            background: #ffcc66;
+        }
+        .message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(15px);
+            padding: 20px 40px;
+            border-radius: 50px;
+            text-align: center;
+            color: gold;
+            font-size: 28px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 20;
+            white-space: nowrap;
+            border: 2px solid #ffaa44;
+            transition: opacity 0.3s;
+            opacity: 0;
+        }
+        .level-select {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(12px);
+            padding: 20px;
+            border-radius: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 30;
+            pointer-events: auto;
+            border: 2px solid #ffaa44;
+        }
+        .level-btn {
+            background: #2a2a3a;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 20px;
+        }
+        @media (max-width: 600px) {
+            .panel { font-size: 12px; padding: 5px 12px; }
+            .message-overlay { font-size: 20px; padding: 15px 30px; white-space: nowrap; }
+            .level-btn { padding: 8px 16px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="panel" id="level-info">🌊 关卡 1 / 5</div>
+        <div class="panel"><button id="resetBtn">🔄 重试当前关</button><button id="menuBtn">📋 选关</button></div>
+    </div>
+    <div id="controls-info">🎮 WASD / 方向键 倾斜平台 | 🎯 到达绿色光柱过关 | 💀 离开路径即失败</div>
+    <div id="message" class="message-overlay"></div>
+    <div id="levelSelectPanel" class="level-select" style="display: none;"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import * as CANNON from 'cannon-es';
+
+        // ----- 关卡数据定义 (路径多边形 + 起点/终点 + 障碍物) -----
+        // 每个关卡: 路径多边形顶点 (XZ平面), 起点坐标, 终点坐标, 宽度视觉, 难度参数
+        const levels = [
+            { // 关卡1: 简单直线宽道
+                name: "初学者之路",
+                pathPolygon: [
+                    [-3, -1], [-2.5, -1], [-2, -1], [0, -1], [2, -1], [3, -1],
+                    [3, 1], [2.5, 1], [2, 1], [0, 1], [-2, 1], [-3, 1]
+                ],
+                startPos: { x: 0, z: -0.5 },
+                goalPos: { x: 0, z: 0.5 },
+                pathWidth: 1.8,
+                obstacles: []
+            },
+            { // 关卡2: S形弯道，稍窄
+                name: "蜿蜒小径",
+                pathPolygon: [
+                    [-2.5, -1.2], [-1.5, -1.2], [0, -0.5], [1.5, 0.2], [2.5, 0.8],
+                    [2.5, 1.5], [1.5, 1.5], [0, 0.8], [-1.5, 0.2], [-2.5, -0.5], [-2.5, -1.2]
+                ],
+                startPos: { x: -2, z: -0.8 },
+                goalPos: { x: 2, z: 1.2 },
+                pathWidth: 1.2,
+                obstacles: []
+            },
+            { // 关卡3: 窄桥 + 直角转弯
+                name: "险峻窄桥",
+                pathPolygon: [
+                    [-2.5, -1], [-2, -1], [-1, -1], [0, -1], [1, -0.5], [1.5, 0], [1.5, 1], [0.5, 1], [-0.5, 1], [-1.5, 1], [-2.5, 1]
+                ],
+                startPos: { x: -2, z: -0.8 },
+                goalPos: { x: -0.5, z: 0.8 },
+                pathWidth: 0.9,
+                obstacles: []
+            },
+            { // 关卡4: 移动障碍物 (动态平台)
+                name: "移动陷阱",
+                pathPolygon: [
+                    [-3, -1.2], [-2, -1.2], [-1, -0.8], [0, -0.3], [1, 0.2], [2, 0.7], [3, 1.2],
+                    [3, 1.8], [2, 1.8], [1, 1.3], [0, 0.8], [-1, 0.3], [-2, -0.2], [-3, -0.7], [-3, -1.2]
+                ],
+                startPos: { x: -2.5, z: -1 },
+                goalPos: { x: 2.5, z: 1.5 },
+                pathWidth: 1.0,
+                obstacles: [{ type: "movingBar", startX: -1, endX: 1, z: 0, width: 0.4, speed: 1.2 }]
+            },
+            { // 关卡5: 复杂迷宫 + 旋转障碍
+                name: "终极迷宫",
+                pathPolygon: [
+                    [-3, -1.5], [-2, -1.5], [-1, -1.2], [0, -1], [1, -1.2], [2, -1.5], [3, -1.5],
+                    [3, -0.5], [2, -0.2], [1, 0], [0, -0.2], [-1, 0], [-2, -0.2], [-3, -0.5],
+                    [-3, 0.5], [-2, 0.8], [-1, 1], [0, 0.8], [1, 1], [2, 0.8], [3, 0.5], [3, 1.5],
+                    [2, 1.8], [1, 1.5], [0, 1.8], [-1, 1.5], [-2, 1.8], [-3, 1.5]
+                ],
+                startPos: { x: -2.5, z: -1.2 },
+                goalPos: { x: 2.5, z: 1.2 },
+                pathWidth: 0.8,
+                obstacles: [{ type: "rotatingBar", radius: 1.2, centerX: 0, centerZ: 0, speed: 1.5 }]
+            }
+        ];
+
+        let currentLevelIdx = 0;
+        let gameActive = true;
+        let winFlag = false;
+        let scene, camera, renderer, playerBall, platformBody, platformMesh;
+        let world, ballBody;
+        let keyState = { w: false, s: false, a: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        let currentRotX = 0, currentRotZ = 0, targetRotX = 0, targetRotZ = 0;
+        const MAX_TILT = 0.65;
+        const TILT_SPEED = 2.0;
+        const PLAYER_SPEED_FACTOR = 4.5;
+        
+        let currentLevelData = null;
+        let pathPolygon = [];      // 二维多边形顶点 (Vector2)
+        let goalArea = { x: 0, z: 0, radius: 0.5 };
+        let startPoint = { x: 0, z: 0 };
+        let dynamicObstacles = [];
+        let clock = new THREE.Clock();
+        let animationId;
+        let messageDiv = document.getElementById('message');
+        let levelInfoDiv = document.getElementById('level-info');
+        
+        // 辅助函数: 点是否在多边形内 (射线法)
+        function pointInPolygon(px, pz, vertices) {
+            let inside = false;
+            for (let i = 0, j = vertices.length-1; i < vertices.length; j = i++) {
+                let xi = vertices[i].x, zi = vertices[i].z;
+                let xj = vertices[j].x, zj = vertices[j].z;
+                let intersect = ((zi > pz) != (zj > pz)) && (px < (xj - xi) * (pz - zi) / (zj - zi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+        
+        // 加载关卡
+        function loadLevel(levelIdx) {
+            if (animationId) cancelAnimationFrame(animationId);
+            // 清理旧物理物体
+            if (world) {
+                world.bodies.forEach(body => { if (body !== ballBody && body !== platformBody) world.removeBody(body); });
+            }
+            currentLevelIdx = Math.min(levelIdx, levels.length-1);
+            currentLevelData = levels[currentLevelIdx];
+            levelInfoDiv.innerText = `🌊 关卡 ${currentLevelIdx+1} / 5: ${currentLevelData.name}`;
+            
+            // 构建路径多边形 (Vector2数组)
+            pathPolygon = currentLevelData.pathPolygon.map(p => new THREE.Vector2(p[0], p[1]));
+            startPoint = { x: currentLevelData.startPos.x, z: currentLevelData.startPos.z };
+            goalArea = { x: currentLevelData.goalPos.x, z: currentLevelData.goalPos.z, radius: 0.55 };
+            
+            // 重置小球位置
+            if (ballBody) {
+                ballBody.position.set(startPoint.x, 0.4, startPoint.z);
+                ballBody.velocity.setZero();
+                ballBody.angularVelocity.setZero();
+            }
+            // 重置平台倾斜
+            targetRotX = 0; targetRotZ = 0; currentRotX = 0; currentRotZ = 0;
+            if (platformBody) platformBody.quaternion.setFromEuler(0,0,0);
+            if (platformMesh) platformMesh.quaternion.setFromEuler(0,0,0);
+            
+            gameActive = true;
+            winFlag = false;
+            messageDiv.style.opacity = "0";
+            
+            // 重建视觉路径和障碍物
+            rebuildVisualPath();
+            createDynamicObstacles();
+            startGameLoop();
+        }
+        
+        // 视觉重建 (路径地面 + 深渊)
+        let pathGroup = null;
+        function rebuildVisualPath() {
+            if (pathGroup) scene.remove(pathGroup);
+            pathGroup = new THREE.Group();
+            // 创建路径平面 (拉伸多边形)
+            const shape = new THREE.Shape();
+            const points = currentLevelData.pathPolygon.map(p => new THREE.Vector2(p[0], p[1]));
+            shape.moveTo(points[0].x, points[0].y);
+            for (let i=1; i<points.length; i++) shape.lineTo(points[i].x, points[i].y);
+            shape.closePath();
+            const geom = new THREE.ShapeGeometry(shape);
+            const pathMat = new THREE.MeshStandardMaterial({ color: 0x8aad70, roughness: 0.4, metalness: 0.1 });
+            const pathMesh = new THREE.Mesh(geom, pathMat);
+            pathMesh.rotation.x = -Math.PI/2;
+            pathMesh.position.y = -0.05;
+            pathMesh.receiveShadow = true;
+            pathGroup.add(pathMesh);
+            
+            // 边缘光带
+            const edges = new THREE.EdgesGeometry(geom);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffaa66 });
+            const wire = new THREE.LineSegments(edges, lineMat);
+            wire.rotation.x = -Math.PI/2;
+            wire.position.y = -0.03;
+            pathGroup.add(wire);
+            
+            // 深渊效果 (在路径下方添加半透明黑色平面)
+            const abyssMat = new THREE.MeshStandardMaterial({ color: 0x0a0a2a, emissive: 0x000000, transparent: true, opacity: 0.6 });
+            const abyssPlane = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), abyssMat);
+            abyssPlane.rotation.x = -Math.PI/2;
+            abyssPlane.position.y = -0.3;
+            abyssPlane.receiveShadow = false;
+            pathGroup.add(abyssPlane);
+            
+            scene.add(pathGroup);
+            
+            // 起点/终点标记
+            if (window.startMarker) scene.remove(window.startMarker);
+            const startMarker = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.05, 16), new THREE.MeshStandardMaterial({ color: 0x44aaff, emissive: 0x2266aa }));
+            startMarker.position.set(startPoint.x, -0.02, startPoint.z);
+            startMarker.rotation.x = Math.PI/2;
+            scene.add(startMarker);
+            window.startMarker = startMarker;
+            
+            if (window.goalMarker) scene.remove(window.goalMarker);
+            const goalMarker = new THREE.Mesh(new THREE.CylinderGeometry(goalArea.radius, goalArea.radius, 0.1, 32), new THREE.MeshStandardMaterial({ color: 0x88ff88, emissive: 0x44aa44 }));
+            goalMarker.position.set(goalArea.x, -0.02, goalArea.z);
+            goalMarker.rotation.x = Math.PI/2;
+            scene.add(goalMarker);
+            window.goalMarker = goalMarker;
+        }
+        
+        // 动态障碍物
+        function createDynamicObstacles() {
+            if (window.obstacleGroup) scene.remove(window.obstacleGroup);
+            const obsGroup = new THREE.Group();
+            window.dynamicObstaclesData = [];
+            for (let obs of currentLevelData.obstacles) {
+                if (obs.type === "movingBar") {
+                    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), new THREE.MeshStandardMaterial({ color: 0xdd6644, emissive: 0x441100 }));
+                    bar.userData = { type: "moving", startX: obs.startX, endX: obs.endX, z: obs.z, speed: obs.speed, direction: 1 };
+                    obsGroup.add(bar);
+                    window.dynamicObstaclesData.push(bar);
+                } else if (obs.type === "rotatingBar") {
+                    const rotGroup = new THREE.Group();
+                    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xdd8844 }));
+                    arm.position.x = obs.radius;
+                    rotGroup.add(arm);
+                    const centerBall = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({ color: 0xffaa66 }));
+                    rotGroup.add(centerBall);
+                    rotGroup.position.set(obs.centerX, 0.1, obs.centerZ);
+                    rotGroup.userData = { type: "rotating", speed: obs.speed, angle: 0 };
+                    obsGroup.add(rotGroup);
+                    window.dynamicObstaclesData.push(rotGroup);
+                }
+            }
+            scene.add(obsGroup);
+            window.obstacleGroup = obsGroup;
+        }
+        
+        function updateDynamicObstacles(delta) {
+            if (!window.dynamicObstaclesData) return;
+            for (let obj of window.dynamicObstaclesData) {
+                if (obj.userData.type === "moving") {
+                    let newX = obj.position.x + obj.userData.speed * delta * obj.userData.direction;
+                    if (newX > obj.userData.endX) { newX = obj.userData.endX; obj.userData.direction = -1; }
+                    if (newX < obj.userData.startX) { newX = obj.userData.startX; obj.userData.direction = 1; }
+                    obj.position.x = newX;
+                } else if (obj.userData.type === "rotating") {
+                    obj.userData.angle += obj.userData.speed * delta;
+                    obj.rotation.z = obj.userData.angle;
+                }
+            }
+        }
+        
+        // 失败处理
+        function failGame() {
+            if (!gameActive || winFlag) return;
+            gameActive = false;
+            messageDiv.innerText = "💀 跌落深渊！游戏结束 💀";
+            messageDiv.style.opacity = "1";
+            setTimeout(() => { messageDiv.style.opacity = "0"; }, 2000);
+        }
+        
+        // 胜利处理
+        function winGame() {
+            if (winFlag) return;
+            winFlag = true;
+            gameActive = false;
+            messageDiv.innerText = "🎉 通关！进入下一关 🎉";
+            messageDiv.style.opacity = "1";
+            setTimeout(() => {
+                messageDiv.style.opacity = "0";
+                if (currentLevelIdx + 1 < levels.length) {
+                    loadLevel(currentLevelIdx + 1);
+                } else {
+                    messageDiv.innerText = "🏆 恭喜完成全部关卡！ 🏆";
+                    messageDiv.style.opacity = "1";
+                    setTimeout(() => messageDiv.style.opacity = "0", 3000);
+                }
+            }, 1500);
+        }
+        
+        // 初始化Three场景
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050b2a);
+            scene.fog = new THREE.FogExp2(0x050b2a, 0.02);
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.set(4, 5, 6);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            // 光照
+            const ambient = new THREE.AmbientLight(0x4c5c6c);
+            scene.add(ambient);
+            const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
+            dirLight.position.set(5, 8, 3);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+            const fillLight = new THREE.PointLight(0x88aaff, 0.4);
+            fillLight.position.set(-2, 3, 2);
+            scene.add(fillLight);
+            
+            // 平台 (动态刚体)
+            const platformMat = new THREE.MeshStandardMaterial({ color: 0x6a8e5a, roughness: 0.7, transparent: true, opacity: 0.8 });
+            platformMesh = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 7), platformMat);
+            platformMesh.receiveShadow = true;
+            platformMesh.castShadow = true;
+            platformMesh.position.y = -0.2;
+            scene.add(platformMesh);
+            
+            // 物理世界
+            world = new CANNON.World();
+            world.gravity = new CANNON.Vec3(0, -9.82, 0);
+            world.broadphase = new CANNON.NaiveBroadphase();
+            // 平台刚体
+            platformBody = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(3.5, 0.1, 3.5)) });
+            world.addBody(platformBody);
+            // 小球
+            const ballMaterial = new CANNON.Material('ball');
+            const ballShape = new CANNON.Sphere(0.35);
+            ballBody = new CANNON.Body({ mass: 1, material: ballMaterial, shape: ballShape });
+            world.addBody(ballBody);
+            const ballMatVis = new THREE.MeshStandardMaterial({ color: 0xffaa55, metalness: 0.3, roughness: 0.2 });
+            playerBall = new THREE.Mesh(new THREE.SphereGeometry(0.35, 32, 32), ballMatVis);
+            playerBall.castShadow = true;
+            scene.add(playerBall);
+            
+            // 辅助网格
+            const grid = new THREE.GridHelper(14, 20, 0x88aaff, 0x446688);
+            grid.position.y = -0.8;
+            scene.add(grid);
+        }
+        
+        // 物理更新和碰撞检测
+        function updatePhysics(delta) {
+            world.step(1/60, delta, 3);
+            // 同步视觉
+            playerBall.position.copy(ballBody.position);
+            // 路径外检测
+            const pos = ballBody.position;
+            if (gameActive && !winFlag) {
+                if (!pointInPolygon(pos.x, pos.z, pathPolygon)) {
+                    failGame();
+                }
+                // 终点检测
+                const distToGoal = Math.hypot(pos.x - goalArea.x, pos.z - goalArea.z);
+                if (distToGoal < goalArea.radius + 0.2 && gameActive) {
+                    winGame();
+                }
+            }
+            // 动态障碍物碰撞简化 (碰撞导致失败或重置)
+            if (window.dynamicObstaclesData && gameActive) {
+                for (let obs of window.dynamicObstaclesData) {
+                    let obsPos = obs.position;
+                    if (obs.userData.type === "moving") {
+                        if (Math.hypot(pos.x - obsPos.x, pos.z - obsPos.z) < 0.55) failGame();
+                    } else if (obs.userData.type === "rotating") {
+                        // 粗略检测旋转臂
+                        const angle = obs.userData.angle;
+                        const radius = 0.8;
+                        const armX = obs.position.x + Math.cos(angle) * radius;
+                        const armZ = obs.position.z + Math.sin(angle) * radius;
+                        if (Math.hypot(pos.x - armX, pos.z - armZ) < 0.5) failGame();
+                    }
+                }
+            }
+        }
+        
+        // 键盘控制倾斜
+        function updateTilt(delta) {
+            let tiltX = 0, tiltZ = 0;
+            if (keyState.w || keyState.ArrowUp) tiltX -= 1;
+            if (keyState.s || keyState.ArrowDown) tiltX += 1;
+            if (keyState.a || keyState.ArrowLeft) tiltZ -= 1;
+            if (keyState.d || keyState.ArrowRight) tiltZ += 1;
+            if (tiltX !== 0 || tiltZ !== 0) { const len = Math.hypot(tiltX, tiltZ); tiltX /= len; tiltZ /= len; }
+            targetRotX += tiltX * TILT_SPEED * delta;
+            targetRotZ += tiltZ * TILT_SPEED * delta;
+            targetRotX = Math.min(MAX_TILT, Math.max(-MAX_TILT, targetRotX));
+            targetRotZ = Math.min(MAX_TILT, Math.max(-MAX_TILT, targetRotZ));
+            if (tiltX === 0) targetRotX *= 0.98;
+            if (tiltZ === 0) targetRotZ *= 0.98;
+            const lerp = 10 * delta;
+            currentRotX += (targetRotX - currentRotX) * lerp;
+            currentRotZ += (targetRotZ - currentRotZ) * lerp;
+            const quat = new CANNON.Quaternion();
+            quat.setFromEuler(currentRotX, 0, currentRotZ);
+            platformBody.quaternion.copy(quat);
+            platformMesh.quaternion.setFromEuler(currentRotX, 0, currentRotZ);
+        }
+        
+        // 相机跟随
+        function updateCamera() {
+            const targetPos = playerBall.position.clone();
+            const offset = new THREE.Vector3(3, 4.5, 5);
+            camera.position.lerp(targetPos.clone().add(offset), 0.08);
+            camera.lookAt(targetPos);
+        }
+        
+        function animate() {
+            const delta = Math.min(0.033, clock.getDelta());
+            if (gameActive && !winFlag) {
+                updateTilt(delta);
+                updatePhysics(delta);
+                updateDynamicObstacles(delta);
+            }
+            updateCamera();
+            renderer.render(scene, camera);
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        function startGameLoop() {
+            if (animationId) cancelAnimationFrame(animationId);
+            animate();
+        }
+        
+        // 键盘监听
+        function setupControls() {
+            window.addEventListener('keydown', (e) => {
+                const k = e.key;
+                if (k === 'w' || k === 'W') keyState.w = true;
+                if (k === 's' || k === 'S') keyState.s = true;
+                if (k === 'a' || k === 'A') keyState.a = true;
+                if (k === 'd' || k === 'D') keyState.d = true;
+                if (k === 'ArrowUp') keyState.ArrowUp = true;
+                if (k === 'ArrowDown') keyState.ArrowDown = true;
+                if (k === 'ArrowLeft') keyState.ArrowLeft = true;
+                if (k === 'ArrowRight') keyState.ArrowRight = true;
+                if (['w','s','a','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k)) e.preventDefault();
+            });
+            window.addEventListener('keyup', (e) => {
+                const k = e.key;
+                if (k === 'w' || k === 'W') keyState.w = false;
+                if (k === 's' || k === 'S') keyState.s = false;
+                if (k === 'a' || k === 'A') keyState.a = false;
+                if (k === 'd' || k === 'D') keyState.d = false;
+                if (k === 'ArrowUp') keyState.ArrowUp = false;
+                if (k === 'ArrowDown') keyState.ArrowDown = false;
+                if (k === 'ArrowLeft') keyState.ArrowLeft = false;
+                if (k === 'ArrowRight') keyState.ArrowRight = false;
+            });
+        }
+        
+        // UI 按钮
+        function initUI() {
+            document.getElementById('resetBtn').onclick = () => { loadLevel(currentLevelIdx); };
+            document.getElementById('menuBtn').onclick = () => {
+                const panel = document.getElementById('levelSelectPanel');
+                panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+                if (panel.style.display === 'flex') {
+                    panel.innerHTML = '';
+                    for (let i=0; i<levels.length; i++) {
+                        const btn = document.createElement('button');
+                        btn.innerText = `${i+1}. ${levels[i].name}`;
+                        btn.classList.add('level-btn');
+                        btn.onclick = () => {
+                            loadLevel(i);
+                            panel.style.display = 'none';
+                        };
+                        panel.appendChild(btn);
+                    }
+                }
+            };
+        }
+        
+        function init() {
+            initScene();
+            setupControls();
+            initUI();
+            loadLevel(0);
+        }
+        
+        init();
+    </script>
+</body>
+</html>
