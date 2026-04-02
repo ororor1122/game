@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+<title>资产管理中心 - 手机版策略游戏</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+body {
+    font-family: 'Segoe UI', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+}
+/* 游戏容器 - 手机适配 */
+#game {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    background: #0d0d1a;
+    border-radius: 24px;
+    border: 2px solid #3a3a5c;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+/* 顶部状态栏 */
+#topBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to bottom, #12122a, #1a1a3a);
+    padding: 12px 16px;
+    border-bottom: 2px solid #3a3a5c;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+#topBar h1 {
+    font-size: 1.1rem;
+    color: #00d4ff;
+    letter-spacing: 1px;
+    margin: 0;
+}
+.stat-box {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #3a3a5c;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    color: #f1c40f;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.stat-box .lbl {
+    color: #aaa;
+    font-size: 0.7rem;
+}
+.stat-box .val {
+    font-weight: bold;
+}
+#progressBar {
+    flex: 1;
+    height: 8px;
+    background: #2a2a3a;
+    border-radius: 10px;
+    overflow: hidden;
+}
+#progressFill {
+    height: 100%;
+    background: linear-gradient(90deg, #00d4ff, #2ecc71);
+    width: 0%;
+    transition: width 0.2s;
+}
+/* 地图区域 */
+#mapContainer {
+    padding: 12px;
+    background: #0a0a1a;
+}
+canvas#gameCanvas {
+    width: 100%;
+    height: auto;
+    background: #2f3e2e;
+    border-radius: 16px;
+    display: block;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+/* 操作面板 */
+#actionPanel {
+    padding: 12px 16px;
+    background: #0d0d1a;
+    border-top: 1px solid #3a3a5c;
+    border-bottom: 1px solid #3a3a5c;
+}
+/* 资产配置滑块区 */
+.asset-config {
+    background: #14142a;
+    border-radius: 20px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+.ap-title {
+    font-size: 0.8rem;
+    color: #5a5a8a;
+    text-align: center;
+    margin-bottom: 10px;
+}
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+}
+.slider-container button {
+    background: #2c2c4a;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 44px;
+    font-size: 1.4rem;
+    color: #00d4ff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.slider-container button:active {
+    transform: scale(0.95);
+}
+input[type="range"] {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    background: #3a3a5c;
+    border-radius: 8px;
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px;
+    height: 28px;
+    background: #00d4ff;
+    border-radius: 28px;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #888;
+    margin: 6px 0;
+}
+.preview {
+    font-size: 0.75rem;
+    background: #1f1c13;
+    padding: 8px;
+    border-radius: 12px;
+    margin-top: 8px;
+    text-align: center;
+    color: #ddd;
+}
+.preview span {
+    color: #00d4ff;
+}
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0;
+}
+.button-group button {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px 8px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 40px;
+    background: linear-gradient(to bottom, #00d4ff, #0099cc);
+    color: #0d0d1a;
+    cursor: pointer;
+    transition: 0.1s;
+}
+.button-group button:active {
+    transform: scale(0.97);
+}
+#rankBtn {
+    background: #2c2c4a;
+    color: #f1c40f;
+    border: 1px solid #f1c40f;
+}
+#restartBtn {
+    background: transparent;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+}
+#skillBtn {
+    background: #2c2c4a;
+    color: #00d4ff;
+    border: 1px solid #00d4ff;
+}
+/* 指标卡片区 (两列网格) */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0;
+}
+.kpi-card {
+    background: #14142a;
+    border: 1px solid #3a3a5c;
+    border-radius: 16px;
+    padding: 10px 4px;
+    text-align: center;
+}
+.kpi-name {
+    font-size: 0.7rem;
+    color: #aaa;
+}
+.kpi-value {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-top: 4px;
+}
+/* 事件日志 */
+.log-box {
+    background: #0f0e09;
+    border-radius: 16px;
+    padding: 8px;
+    margin-top: 8px;
+    height: 150px;
+    overflow-y: auto;
+}
+.log-title {
+    font-size: 0.7rem;
+    color: #aaa;
+    text-align: center;
+    margin-bottom: 6px;
+}
+.log-entry {
+    font-size: 0.7rem;
+    line-height: 1.4;
+    padding: 4px 6px;
+    border-left: 2px solid #3a3a5c;
+    margin-bottom: 4px;
+    color: #ccc;
+}
+.log-entry.good { border-left-color: #2ecc71; color: #2ecc71; }
+.log-entry.bad  { border-left-color: #e74c3c; color: #e74c3c; }
+.log-entry.info { border-left-color: #00d4ff; color: #00d4ff; }
+.log-entry.event { border-left-color: #f1c40f; color: #f1c40f; font-weight: bold; }
+/* K线图 */
+#chartContainer {
+    padding: 12px;
+    background: #0a0a1a;
+    border-top: 1px solid #3a3a5c;
+}
+.chart-title {
+    font-size: 0.7rem;
+    color: #aaa;
+    margin-bottom: 6px;
+    text-align: center;
+}
+canvas#klineChart {
+    width: 100%;
+    height: 140px;
+    background: #0a0a1a;
+    border-radius: 12px;
+}
+/* 模态框通用 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background: #1e1e2e;
+    border-radius: 28px;
+    width: 90%;
+    max-width: 340px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 20px;
+    border: 2px solid #00d4ff;
+    color: white;
+}
+.modal-title {
+    text-align: center;
+    font-size: 1.3rem;
+    margin-bottom: 16px;
+    color: #00d4ff;
+}
+.skill-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+    padding: 8px;
+    background: #0a0a1a;
+    border-radius: 40px;
+    flex-wrap: wrap;
+}
+.skill-name {
+    width: 80px;
+    font-size: 0.85rem;
+}
+.skill-level {
+    width: 50px;
+    text-align: center;
+}
+.skill-buttons {
+    display: flex;
+    gap: 8px;
+}
+.skill-buttons button {
+    width: 44px;
+    height: 44px;
+    border-radius: 44px;
+    font-size: 1.2rem;
+    background: #00d4ff;
+    border: none;
+    font-weight: bold;
+}
+.skill-buttons button:disabled {
+    background: #666;
+}
+.modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 20px;
+}
+.modal-footer button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 40px;
+    font-size: 1rem;
+    background: linear-gradient(to bottom, #00d4ff, #0099cc);
+    border: none;
+    font-weight: bold;
+}
+.modal-footer .cancel-btn {
+    background: #3a3a5c;
+    color: white;
+}
+.rank-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.7rem;
+}
+.rank-table th, .rank-table td {
+    padding: 6px 2px;
+    border-bottom: 1px solid #3a3a5c;
+    text-align: center;
+}
+.highlight-row { background: rgba(241,196,15,0.3); }
+.current-result { margin-top: 12px; font-size: 0.75rem; text-align: center; color: #f1c40f; }
+.name-input-group input {
+    width: 100%;
+    background: #0a0a1a;
+    border: 1px solid #00d4ff;
+    border-radius: 40px;
+    padding: 12px;
+    text-align: center;
+    font-size: 1.2rem;
+    letter-spacing: 4px;
+    color: white;
+}
+.error-msg { color: #e74c3c; font-size: 0.7rem; margin-top: 4px; text-align: center; }
+.overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+}
+.overlay.show { display: flex; }
+.overlay-title {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 16px;
+}
+#winOverlay .overlay-title { color: #2ecc71; }
+#loseOverlay .overlay-title { color: #e74c3c; }
+.overlay-sub { color: #ccc; margin-bottom: 12px; }
+.overlay-score { color: #f1c40f; font-size: 1.2rem; margin-bottom: 20px; }
+.overlay-btn {
+    background: linear-gradient(to bottom, #00d4ff, #0099cc);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 40px;
+    font-size: 1rem;
+    font-weight: bold;
+    margin: 0 6px;
+}
+.overlay-btn.secondary {
+    background: transparent;
+    border: 1px solid #00d4ff;
+    color: #00d4ff;
+}
+.rules {
+    font-size: 0.75rem;
+    background: rgba(0,0,0,0.4);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 16px;
+}
+</style>
+</head>
+<body>
+<div id="game">
+    <div id="topBar">
+        <h1>🏢 资产管理</h1>
+        <div class="stat-box"><span class="lbl">资产</span><span class="val" id="assetDisplay">10,000</span></div>
+        <div class="stat-box"><span class="lbl">天数</span><span class="val" id="dayDisplay">1/30</span></div>
+        <div id="progressBar"><div id="progressFill"></div></div>
+    </div>
+    <div id="mapContainer">
+        <canvas id="gameCanvas" width="400" height="300" style="width:100%; height:auto; aspect-ratio:4/3"></canvas>
+    </div>
+    <div id="actionPanel">
+        <div class="asset-config">
+            <div class="ap-title">📊 资产配置</div>
+            <div class="slider-container">
+                <button class="adj-btn" onclick="adjustSlider(-1)">−</button>
+                <input type="range" id="stockSlider" min="0" max="100" value="50">
+                <button class="adj-btn" onclick="adjustSlider(1)">+</button>
+            </div>
+            <div class="slider-labels"><span>债券100%</span><span>股票100%</span></div>
+            <div class="preview" id="preview">股票占比 <span id="stockPctLbl">50%</span> 金额：<span id="stockAmt">5,000</span><br>债券占比 <span id="bondPctLbl">50%</span> 金额：<span id="bondAmt">5,000</span></div>
+        </div>
+        <div class="button-group">
+            <button id="skillBtn" onclick="openSkillModal()">✨ 升级(<span id="skillPointsRemaining">0</span>)</button>
+            <button id="rankBtn" onclick="showRankingModal(false)">🏆 排行榜</button>
+        </div>
+        <div class="button-group">
+            <button id="endDayBtn" onclick="endDay()">⏰ 结束一天</button>
+            <button id="restartBtn" onclick="restartGame()">🔄 重开</button>
+        </div>
+        <div class="metrics-grid" id="kpiGrid">
+            <div class="kpi-card"><div class="kpi-name">📊 累计收益</div><div class="kpi-value" id="kpiTotalReturn">--</div></div>
+            <div class="kpi-card"><div class="kpi-name">📉 最大回撤</div><div class="kpi-value orange" id="kpiMaxDrawdown">--</div></div>
+            <div class="kpi-card"><div class="kpi-name">✅ 胜率</div><div class="kpi-value" id="kpiWinRate">--</div></div>
+            <div class="kpi-card"><div class="kpi-name">⚖️ 夏普</div><div class="kpi-value orange" id="kpiSharpe">--</div></div>
+        </div>
+        <div class="log-box">
+            <div class="log-title">📋 事件日志</div>
+            <div id="logContainer"></div>
+        </div>
+    </div>
+    <div id="chartContainer">
+        <div class="chart-title">📈 资产净值走势</div>
+        <canvas id="klineChart" width="400" height="140"></canvas>
+    </div>
+</div>
+
+<!-- 技能升级模态框 -->
+<div id="skillModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title">✨ 永久能力升级</div>
+        <div style="text-align:center;">剩余技能点: <span id="modalSkillPoints">0</span></div>
+        <div class="skill-line"><span class="skill-name">📈 股票敏锐</span><span class="skill-level" id="skillStockDisplay">Lv.0</span><div class="skill-buttons"><button class="skill-btn-down" id="downgradeStockBtn" onclick="adjustTemp('stockSense', -1)">−</button><button class="skill-btn-up" id="upgradeStockBtn" onclick="adjustTemp('stockSense', 1)">+</button></div><span class="skill-effect">下限+<span id="stockEffectVal">0.000</span></span></div>
+        <div class="skill-line"><span class="skill-name">📉 债券分析</span><span class="skill-level" id="skillBondDisplay">Lv.0</span><div class="skill-buttons"><button class="skill-btn-down" id="downgradeBondBtn" onclick="adjustTemp('bondSense', -1)">−</button><button class="skill-btn-up" id="upgradeBondBtn" onclick="adjustTemp('bondSense', 1)">+</button></div><span class="skill-effect">下限+<span id="bondEffectVal">0.000</span></span></div>
+        <div class="skill-line"><span class="skill-name">🛡️ 风险防御</span><span class="skill-level" id="skillRiskDisplay">Lv.0</span><div class="skill-buttons"><button class="skill-btn-down" id="downgradeRiskBtn" onclick="adjustTemp('riskDef', -1)">−</button><button class="skill-btn-up" id="upgradeRiskBtn" onclick="adjustTemp('riskDef', 1)">+</button></div><span class="skill-effect">概率-<span id="riskEffectVal">0.0</span>%</span></div>
+        <div class="skill-line"><span class="skill-name">💡 事件应对</span><span class="skill-level" id="skillEventDisplay">Lv.0</span><div class="skill-buttons"><button class="skill-btn-down" id="downgradeEventBtn" onclick="adjustTemp('eventMaster', -1)">−</button><button class="skill-btn-up" id="upgradeEventBtn" onclick="adjustTemp('eventMaster', 1)">+</button></div><span class="skill-effect">偏向+<span id="eventEffectVal">0</span>%</span></div>
+        <div class="modal-footer"><button onclick="confirmSkillChanges()">确认升级</button><button class="cancel-btn" onclick="cancelSkillChanges()">取消</button></div>
+    </div>
+</div>
+
+<!-- 排行榜模态框 -->
+<div id="rankModal" class="modal"><div class="modal-content"><div class="modal-title">🏆 排行榜(前五)</div><div id="rankTableContainer"></div><div id="currentResult" class="current-result"></div><div class="modal-footer"><button onclick="closeRankModal()">关闭</button></div></div></div>
+
+<!-- 姓名输入模态框 -->
+<div id="nameInputModal" class="modal"><div class="modal-content"><div class="modal-title">✨ 进入前五</div><div class="name-input-group"><div>输入姓名(3位大写字母)</div><input type="text" id="playerName" maxlength="3" style="text-transform:uppercase"><div id="nameError" class="error-msg"></div></div><div class="modal-footer"><button onclick="submitName()">确认</button><button onclick="cancelNameInput()" style="background:#3a3a5c;">取消</button></div></div></div>
+
+<!-- 开始/结束覆盖层 -->
+<div class="overlay show" id="startOverlay"><div class="overlay-title">资产管理中心</div><div class="overlay-sub">30天达成50,000资产</div><div class="rules"><strong>玩法：</strong> 调整股债比例，点“结束一天”<br>📈股票:-20%~30% 📊债券:-1%~7%<br>🎲事件概率20%<br>⚡每5天得3技能点，永久升级</div><button class="overlay-btn" onclick="startGame()">开始游戏</button></div>
+<div class="overlay" id="winOverlay"><div class="overlay-title">MISSION COMPLETE！</div><div class="overlay-sub" id="winAsset"></div><div><button class="overlay-btn" onclick="showRankingModal(true)">查看排行榜</button><button class="overlay-btn secondary" onclick="restartGame()">再玩一局</button></div></div>
+<div class="overlay" id="loseOverlay"><div class="overlay-title">YOU ARE FIRED！</div><div class="overlay-sub" id="loseAsset"></div><div><button class="overlay-btn" onclick="showRankingModal(true)">查看排行榜</button><button class="overlay-btn secondary" onclick="restartGame()">再玩一局</button></div></div>
+
+<script>
+// ------------------- 游戏核心变量 (与PC版逻辑完全一致) -------------------
+var C = { START: 10000, TARGET: 50000, DAYS: 30, BASE_EVENT_PCT: 0.20 };
+var skillPoints = 0;
+var skillLevels = { stockSense: 0, bondSense: 0, riskDef: 0, eventMaster: 0 };
+var MAX_SKILL = 10;
+var tempPoints = 0;
+var tempLevels = { stockSense: 0, bondSense: 0, riskDef: 0, eventMaster: 0 };
+var EVENTS = [
+    { name: "贸易摩擦升级", pct: -8, desc: "关税冲击" }, { name: "央行降息", pct: 6, desc: "流动性宽松" },
+    { name: "全球疫情冲击", pct: -15, desc: "供应链中断" }, { name: "新能源政策利好", pct: 10, desc: "绿色补贴" },
+    { name: "地缘冲突爆发", pct: -12, desc: "市场恐慌" }, { name: "AI技术突破", pct: 7, desc: "科技股领涨" },
+    { name: "银行危机", pct: -10, desc: "金融动荡" }, { name: "财政刺激法案", pct: 5, desc: "消费回暖" }
+];
+var S = {
+    day: 1, asset: C.START, stockPct: 50, bondPct: 50,
+    stockAmount: C.START * 0.5, bondAmount: C.START * 0.5,
+    history: [C.START], dailyStockRatios: [], log: [], over: false
+};
+
+function fmt(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function addLog(msg, type) {
+    S.log.unshift({ msg, type });
+    if (S.log.length > 20) S.log.pop();
+    document.getElementById("logContainer").innerHTML = S.log.map(e => `<div class="log-entry ${e.type}">${e.msg}</div>`).join("");
+}
+function getEffectiveLevel(skill) { return skillLevels[skill] + tempLevels[skill]; }
+function getStockFactor() { let low = 0.8 + getEffectiveLevel('stockSense') * 0.002; return low + Math.random() * (1.3 - low); }
+function getBondFactor() { let low = 0.99 + getEffectiveLevel('bondSense') * 0.002; return low + Math.random() * (1.07 - low); }
+function getEventProb() { return Math.max(0.05, C.BASE_EVENT_PCT - getEffectiveLevel('riskDef') * 0.015); }
+function applyEventImpact(p) { let e = getEffectiveLevel('eventMaster'); if(e===0) return p; return p>0 ? p*(1+e*0.01) : p*(1-e*0.01); }
+function updateRateDisplay() {
+    document.getElementById("stockRange") && (document.getElementById("stockRange").innerHTML = (getEffectiveLevel('stockSense')*0.2-20).toFixed(1)+"% ~ 30.0%");
+    document.getElementById("bondRange") && (document.getElementById("bondRange").innerHTML = (getEffectiveLevel('bondSense')*0.2-1).toFixed(1)+"% ~ 7.0%");
+    document.getElementById("eventProbDisplay") && (document.getElementById("eventProbDisplay").innerHTML = (getEventProb()*100).toFixed(1)+"%");
+}
+function awardSkillPointsIfNeeded() {
+    if (S.day === 1 || S.day === 6 || S.day === 11 || S.day === 16 || S.day === 21 || S.day === 26) {
+        skillPoints += 3;
+        addLog(`✨ 获得3技能点！剩余${skillPoints}`, "info");
+        updateSkillUI();
+        updateRateDisplay();
+    }
+}
+function adjustTemp(skill, delta) {
+    if (delta === 1) {
+        if (skillPoints - tempPoints <= 0) { addLog("技能点不足！", "bad"); return; }
+        if (getEffectiveLevel(skill) >= MAX_SKILL) { addLog("已达10级", "bad"); return; }
+        tempLevels[skill]++; tempPoints++;
+    } else {
+        if (tempLevels[skill] <= 0) { addLog("无法撤销已永久分配的点数", "bad"); return; }
+        tempLevels[skill]--; tempPoints--;
+    }
+    updateSkillModalUI();
+    updateRateDisplay();
+}
+function confirmSkillChanges() {
+    if (tempPoints === 0) { closeSkillModal(); return; }
+    for (var sk in tempLevels) if (tempLevels[sk] > 0) {
+        skillLevels[sk] += tempLevels[sk];
+        addLog(`🔧 ${sk==='stockSense'?'股票敏锐':sk==='bondSense'?'债券分析':sk==='riskDef'?'风险防御':'事件应对'} +${tempLevels[sk]}级 → Lv.${skillLevels[sk]}`, "good");
+    }
+    skillPoints -= tempPoints;
+    tempPoints = 0; tempLevels = { stockSense:0, bondSense:0, riskDef:0, eventMaster:0 };
+    updateSkillUI(); updateRateDisplay(); closeSkillModal();
+}
+function cancelSkillChanges() { tempPoints=0; tempLevels={stockSense:0,bondSense:0,riskDef:0,eventMaster:0}; updateRateDisplay(); closeSkillModal(); }
+function updateSkillUI() { document.getElementById("skillPointsRemaining").innerText = skillPoints; }
+function updateSkillModalUI() {
+    let modalPoints = skillPoints - tempPoints;
+    document.getElementById("modalSkillPoints").innerText = modalPoints;
+    let s = skillLevels.stockSense+tempLevels.stockSense;
+    document.getElementById("skillStockDisplay").innerHTML = "Lv."+s;
+    document.getElementById("stockEffectVal").innerText = (s*0.002).toFixed(3);
+    s = skillLevels.bondSense+tempLevels.bondSense;
+    document.getElementById("skillBondDisplay").innerHTML = "Lv."+s;
+    document.getElementById("bondEffectVal").innerText = (s*0.002).toFixed(3);
+    s = skillLevels.riskDef+tempLevels.riskDef;
+    document.getElementById("skillRiskDisplay").innerHTML = "Lv."+s;
+    document.getElementById("riskEffectVal").innerHTML = (s*1.5).toFixed(1);
+    s = skillLevels.eventMaster+tempLevels.eventMaster;
+    document.getElementById("skillEventDisplay").innerHTML = "Lv."+s;
+    document.getElementById("eventEffectVal").innerHTML = s;
+    let remain = skillPoints - tempPoints;
+    document.getElementById("upgradeStockBtn").disabled = (remain===0 || (skillLevels.stockSense+tempLevels.stockSense)>=MAX_SKILL);
+    document.getElementById("downgradeStockBtn").disabled = (tempLevels.stockSense===0);
+    document.getElementById("upgradeBondBtn").disabled = (remain===0 || (skillLevels.bondSense+tempLevels.bondSense)>=MAX_SKILL);
+    document.getElementById("downgradeBondBtn").disabled = (tempLevels.bondSense===0);
+    document.getElementById("upgradeRiskBtn").disabled = (remain===0 || (skillLevels.riskDef+tempLevels.riskDef)>=MAX_SKILL);
+    document.getElementById("downgradeRiskBtn").disabled = (tempLevels.riskDef===0);
+    document.getElementById("upgradeEventBtn").disabled = (remain===0 || (skillLevels.eventMaster+tempLevels.eventMaster)>=MAX_SKILL);
+    document.getElementById("downgradeEventBtn").disabled = (tempLevels.eventMaster===0);
+}
+function openSkillModal() { tempPoints=0; tempLevels={stockSense:0,bondSense:0,riskDef:0,eventMaster:0}; updateSkillModalUI(); document.getElementById("skillModal").style.display = "flex"; }
+function closeSkillModal() { document.getElementById("skillModal").style.display = "none"; }
+function adjustSlider(delta) {
+    if (S.over) return;
+    let sl = document.getElementById("stockSlider");
+    let v = Math.min(100, Math.max(0, parseInt(sl.value,10) + delta));
+    sl.value = v; updatePreview();
+}
+function updatePreview() {
+    let sp = parseInt(document.getElementById("stockSlider").value,10);
+    S.stockPct = sp; S.bondPct = 100-sp;
+    S.stockAmount = Math.round(S.asset * sp / 100);
+    S.bondAmount = S.asset - S.stockAmount;
+    document.getElementById("stockPctLbl").textContent = sp+"%";
+    document.getElementById("bondPctLbl").textContent = (100-sp)+"%";
+    document.getElementById("stockAmt").textContent = fmt(S.stockAmount);
+    document.getElementById("bondAmt").textContent = fmt(S.bondAmount);
+}
+function updateUI() {
+    document.getElementById("assetDisplay").textContent = fmt(S.asset);
+    document.getElementById("dayDisplay").textContent = S.day+"/"+C.DAYS;
+    let prog = ((S.day-1)/C.DAYS)*100;
+    document.getElementById("progressFill").style.width = prog+"%";
+    document.getElementById("endDayBtn").disabled = S.over;
+    document.getElementById("stockSlider").disabled = S.over;
+}
+function endDay() {
+    if (S.over) return;
+    S.dailyStockRatios.push(S.stockPct);
+    let sf = getStockFactor(), bf = getBondFactor();
+    let newStock = Math.round(S.stockAmount * sf);
+    let newBond = Math.round(S.bondAmount * bf);
+    addLog(`股票 ${((sf-1)*100).toFixed(1)}% → ${fmt(newStock)}`, "good");
+    addLog(`债券 ${((bf-1)*100).toFixed(1)}% → ${fmt(newBond)}`, "good");
+    S.stockAmount = newStock; S.bondAmount = newBond; S.asset = newStock+newBond;
+    addLog(`本日资产: ${fmt(S.asset)}`, "info");
+    if (Math.random() < getEventProb()) {
+        let ev = EVENTS[Math.floor(Math.random()*EVENTS.length)];
+        let change = Math.round(S.asset * applyEventImpact(ev.pct) / 100);
+        S.asset += change;
+        let r = S.asset>0 ? newStock/(newStock+newBond) : 0.5;
+        S.stockAmount = Math.round(S.asset * r);
+        S.bondAmount = S.asset - S.stockAmount;
+        addLog(`【${ev.name}】${ev.desc} ${change>=0?"+":""}${fmt(change)}`, "event");
+    }
+    let actual = S.asset>0 ? Math.round(S.stockAmount/S.asset*100) : 50;
+    S.stockPct = actual; S.bondPct = 100-actual;
+    document.getElementById("stockSlider").value = actual;
+    S.history.push(S.asset);
+    S.day++;
+    updateUI(); updatePreview(); drawKline(); calcKPIs();
+    if (S.day > C.DAYS) endGame();
+    else awardSkillPointsIfNeeded();
+}
+function endGame() {
+    S.over = true;
+    let win = (S.asset >= C.TARGET);
+    let msg = win ? "winAsset" : "loseAsset";
+    document.getElementById(msg).innerHTML = "最终资产: "+fmt(S.asset);
+    document.getElementById(win ? "winOverlay" : "loseOverlay").classList.add("show");
+    let res = {
+        finalAsset: S.asset,
+        maxDrawdown: parseFloat(document.getElementById("kpiMaxDrawdown").innerText),
+        sharpeRatio: parseFloat(document.getElementById("kpiSharpe").innerText),
+        avgStockRatio: S.dailyStockRatios.reduce((a,b)=>a+b,0)/S.dailyStockRatios.length
+    };
+    window.lastGameResult = res;
+    checkAndEnterRanking(res);
+}
+// 排行榜（localStorage）
+function loadRanking() { let r = localStorage.getItem("assetRanking"); return r ? JSON.parse(r) : []; }
+function saveRanking(r) { localStorage.setItem("assetRanking", JSON.stringify(r)); }
+function checkAndEnterRanking(res) {
+    let rank = loadRanking();
+    let should = (rank.length<5) || (res.finalAsset > rank[rank.length-1].finalAsset);
+    if (should) { window.pendingResult = res; document.getElementById("nameInputModal").style.display = "flex"; document.getElementById("playerName").value = ""; document.getElementById("nameError").innerText = ""; }
+    else showRankingModal(true);
+}
+function submitName() {
+    let name = document.getElementById("playerName").value.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(name)) { document.getElementById("nameError").innerText = "必须3位大写字母"; return; }
+    let rank = loadRanking();
+    rank.push({ name: name, finalAsset: window.pendingResult.finalAsset, maxDrawdown: window.pendingResult.maxDrawdown, sharpeRatio: window.pendingResult.sharpeRatio, avgStockRatio: window.pendingResult.avgStockRatio });
+    rank.sort((a,b)=>b.finalAsset - a.finalAsset); rank = rank.slice(0,5);
+    saveRanking(rank);
+    document.getElementById("nameInputModal").style.display = "none";
+    showRankingModal(true);
+    window.pendingResult = null;
+}
+function cancelNameInput() { document.getElementById("nameInputModal").style.display = "none"; showRankingModal(true); window.pendingResult = null; }
+function showRankingModal(showCurrent) {
+    let rank = loadRanking();
+    let html = '<table class="rank-table"><tr><th>名次</th><th>姓名</th><th>资产</th><th>回撤</th><th>夏普</th><th>股比</th></tr>';
+    for (let i=0;i<rank.length;i++) {
+        let r = rank[i];
+        let isCur = (window.lastGameResult && r.finalAsset===window.lastGameResult.finalAsset);
+        html += `<tr class="${isCur?'highlight-row':''}"><td>${i+1}</td><td>${r.name}</td><td>${fmt(r.finalAsset)}</td><td>${r.maxDrawdown.toFixed(2)}%</td><td>${r.sharpeRatio.toFixed(3)}</td><td>${r.avgStockRatio.toFixed(1)}%</td></tr>`;
+    }
+    html += '</table>';
+    if (rank.length===0) html = '<p style="text-align:center;">暂无记录</p>';
+    document.getElementById("rankTableContainer").innerHTML = html;
+    if (showCurrent && window.lastGameResult) {
+        let cur = window.lastGameResult;
+        document.getElementById("currentResult").innerHTML = `本次成绩：最终资产 ${fmt(cur.finalAsset)}，回撤 ${cur.maxDrawdown.toFixed(2)}%，夏普 ${cur.sharpeRatio.toFixed(3)}，股比 ${cur.avgStockRatio.toFixed(1)}%`;
+    } else document.getElementById("currentResult").innerHTML = '';
+    document.getElementById("rankModal").style.display = "flex";
+}
+function closeRankModal() { document.getElementById("rankModal").style.display = "none"; }
+function restartGame() {
+    document.querySelectorAll(".overlay.show").forEach(o=>o.classList.remove("show"));
+    S = { day:1, asset:C.START, stockPct:50, bondPct:50, stockAmount:C.START*0.5, bondAmount:C.START*0.5, history:[C.START], dailyStockRatios:[], log:[], over:false };
+    skillPoints = 0; skillLevels = { stockSense:0, bondSense:0, riskDef:0, eventMaster:0 };
+    tempPoints = 0; tempLevels = { stockSense:0, bondSense:0, riskDef:0, eventMaster:0 };
+    awardSkillPointsIfNeeded();
+    updateSkillUI(); updateRateDisplay();
+    document.getElementById("stockSlider").value = 50;
+    updatePreview(); updateUI(); drawKline(); calcKPIs();
+    addLog("游戏已重置", "info");
+    window.lastGameResult = null;
+    drawMap(); // 重绘地图
+}
+function startGame() { document.getElementById("startOverlay").classList.remove("show"); restartGame(); }
+function calcKPIs() {
+    let h = S.history, days = h.length-1;
+    if (days<1) return;
+    let totalRet = (h[h.length-1]/C.START-1)*100;
+    document.getElementById("kpiTotalReturn").textContent = totalRet.toFixed(2)+"%";
+    let peak = h[0], maxDD=0;
+    for (let v of h) { if(v>peak) peak=v; maxDD = Math.max(maxDD, (peak-v)/peak); }
+    document.getElementById("kpiMaxDrawdown").textContent = (maxDD*100).toFixed(2)+"%";
+    let winDays=0; for(let i=1;i<h.length;i++) if(h[i]>h[i-1]) winDays++;
+    document.getElementById("kpiWinRate").textContent = (winDays/(h.length-1)*100).toFixed(2)+"%";
+    let daily = []; for(let i=1;i<h.length;i++) daily.push(h[i]/h[i-1]-1);
+    if(daily.length>=2){
+        let mean = daily.reduce((a,b)=>a+b,0)/daily.length;
+        let variance = daily.reduce((a,b)=>a+Math.pow(b-mean,2),0)/(daily.length-1);
+        let std = Math.sqrt(variance);
+        let sharpe = std>0 ? (mean-0.000079)/std : 0;
+        document.getElementById("kpiSharpe").textContent = sharpe.toFixed(3);
+    }
+}
+function drawKline() {
+    let c = document.getElementById("klineChart"), ctx = c.getContext("2d");
+    let w = c.clientWidth, h = 140; c.width = w; c.height = h;
+    ctx.clearRect(0,0,w,h); ctx.fillStyle = "#0a0a1a"; ctx.fillRect(0,0,w,h);
+    if (S.history.length<2) return;
+    let minV = Math.min(...S.history)*0.9, maxV = Math.max(...S.history)*1.1;
+    let px=10, py=5, pw=w-20, ph=h-15;
+    ctx.strokeStyle = "#2ecc71"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i=0;i<S.history.length;i++) {
+        let x = px + i*pw/(S.history.length-1);
+        let y = py + ph - (S.history[i]-minV)/(maxV-minV)*ph;
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "#ffd966"; ctx.font = "10px sans-serif";
+    let tgtY = py + ph - (C.TARGET-minV)/(maxV-minV)*ph;
+    ctx.strokeStyle = "#e74c3c"; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(px,tgtY); ctx.lineTo(px+pw,tgtY); ctx.stroke(); ctx.setLineDash([]);
+}
+// 地图绘制（相对比例版，保持视觉相似）
+var mapCtx, mapCanvas, mapW, mapH;
+function initMap() {
+    mapCanvas = document.getElementById("gameCanvas");
+    mapCtx = mapCanvas.getContext("2d");
+    function resizeAndDraw() {
+        let rect = mapCanvas.parentElement.getBoundingClientRect();
+        mapW = rect.width;
+        mapH = mapW * 0.75; // 保持比例
+        mapCanvas.width = mapW;
+        mapCanvas.height = mapH;
+        drawMap();
+    }
+    window.addEventListener("resize", resizeAndDraw);
+    resizeAndDraw();
+    startPeopleAnimation();
+}
+function drawMap() {
+    if (!mapCtx) return;
+    let w = mapW, h = mapH;
+    mapCtx.clearRect(0,0,w,h);
+    mapCtx.fillStyle = "#e8dcc8";
+    mapCtx.fillRect(0,0,w,h);
+    // 简单绘制区域示意（保持手机版可读性）
+    mapCtx.fillStyle = "#8bae6e";
+    mapCtx.fillRect(w*0.05, h*0.1, w*0.45, h*0.5);
+    mapCtx.fillStyle = "#b8865b";
+    mapCtx.fillRect(w*0.55, h*0.1, w*0.4, h*0.28);
+    mapCtx.fillStyle = "#9b8b7b";
+    mapCtx.fillRect(w*0.55, h*0.45, w*0.4, h*0.25);
+    mapCtx.fillStyle = "#c9a85c";
+    mapCtx.fillRect(w*0.05, h*0.7, w*0.2, h*0.2);
+    mapCtx.fillStyle = "#9b59b6";
+    mapCtx.fillRect(w*0.3, h*0.7, w*0.3, h*0.2);
+    mapCtx.font = "12px sans-serif";
+    mapCtx.fillStyle = "#fff";
+    mapCtx.fillText("办公区", w*0.1, h*0.2);
+    mapCtx.fillText("交易室", w*0.7, h*0.2);
+    mapCtx.fillText("会议室", w*0.7, h*0.55);
+    mapCtx.fillText("茶水间", w*0.1, h*0.78);
+    mapCtx.fillText("摸鱼区", w*0.4, h*0.78);
+    drawPeople();
+}
+var people = [];
+function initPeople() {
+    people = [];
+    let colors = ["#e74c3c","#3498db","#27ae60","#9b59b6","#f39c12","#1abc9c"];
+    for(let i=0;i<6;i++) people.push({x:0,y:0,color:colors[i],target:{x:0,y:0},moving:false});
+    for(let p of people) randomMove(p);
+}
+function randomMove(p) {
+    let w = mapW, h = mapH;
+    let zones = [[w*0.1,h*0.2],[w*0.2,h*0.2],[w*0.3,h*0.2],[w*0.4,h*0.2],[w*0.7,h*0.2],[w*0.8,h*0.2],[w*0.6,h*0.55],[w*0.7,h*0.55],[w*0.8,h*0.55],[w*0.1,h*0.78],[w*0.4,h*0.78]];
+    let spot = zones[Math.floor(Math.random()*zones.length)];
+    p.target = {x:spot[0], y:spot[1]};
+    p.moving = true;
+}
+function drawPeople() {
+    for (let p of people) {
+        mapCtx.fillStyle = p.color;
+        mapCtx.beginPath(); mapCtx.arc(p.x, p.y, 8, 0, 2*Math.PI); mapCtx.fill();
+        mapCtx.fillStyle = "white";
+        mapCtx.beginPath(); mapCtx.arc(p.x-2, p.y-2, 1.5, 0, 2*Math.PI); mapCtx.fill();
+        mapCtx.beginPath(); mapCtx.arc(p.x+2, p.y-2, 1.5, 0, 2*Math.PI); mapCtx.fill();
+    }
+}
+function updatePeople() {
+    for (let p of people) {
+        if (p.moving && p.target) {
+            let dx = p.target.x - p.x, dy = p.target.y - p.y, dist = Math.hypot(dx,dy);
+            if (dist < 3) {
+                p.x = p.target.x; p.y = p.target.y; p.moving = false;
+                setTimeout(() => randomMove(p), 2000+Math.random()*3000);
+            } else {
+                p.x += dx/dist * 1.5; p.y += dy/dist * 1.5;
+            }
+        } else if (!p.moving && Math.random()<0.01) randomMove(p);
+    }
+    drawMap();
+}
+function startPeopleAnimation() {
+    initPeople();
+    setInterval(() => { if (!S.over) updatePeople(); }, 100);
+}
+window.addEventListener("load", () => { initMap(); drawKline(); calcKPIs(); awardSkillPointsIfNeeded(); updateSkillUI(); updateRateDisplay(); });
+</script>
+</body>
+</html>
