@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>陀螺仪平衡球 - 5关挑战</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            pointer-events: none;
+            z-index: 10;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            border-left: 4px solid #ffaa00;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            z-index: 20;
+            flex-wrap: wrap;
+            pointer-events: auto;
+        }
+        button {
+            background: #2c3e66;
+            border: none;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: 0.2s;
+            font-family: inherit;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        button:active {
+            transform: scale(0.96);
+            background: #1e2a4a;
+        }
+        .sensitivity {
+            background: rgba(0,0,0,0.7);
+            border-radius: 30px;
+            padding: 5px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-size: 14px;
+            backdrop-filter: blur(4px);
+        }
+        input {
+            width: 100px;
+            cursor: pointer;
+        }
+        #level-status {
+            background: #ffaa33;
+            color: #2c1e0a;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: bold;
+        }
+        #message {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: gold;
+            padding: 18px 28px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            pointer-events: none;
+            z-index: 30;
+            white-space: nowrap;
+            backdrop-filter: blur(10px);
+            border: 1px solid gold;
+            transition: 0.3s;
+            opacity: 0;
+        }
+        @media (max-width: 600px) {
+            button { padding: 6px 12px; font-size: 12px; }
+            .sensitivity { font-size: 11px; padding: 4px 8px; }
+            #info { font-size: 10px; top: 10px; left: 10px; }
+            #level-status { font-size: 12px; }
+        }
+        .gyro-tip {
+            position: absolute;
+            top: 80px;
+            right: 12px;
+            background: rgba(0,0,0,0.6);
+            color: #0f0;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            pointer-events: none;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        🎯 平衡球 | 关卡 <span id="level-num">1</span>/5 
+        <span id="level-status">🏁 直线初体验</span>
+    </div>
+    <div id="controls">
+        <button id="resetBtn">🔄 重置本关</button>
+        <button id="calibrateBtn">⚖️ 校准水平</button>
+        <div class="sensitivity">
+            🎚️ 灵敏度 <input type="range" id="sensSlider" min="0.3" max="1.8" step="0.01" value="1.0">
+        </div>
+        <button id="gyroBtn" style="background:#aa5533;">📳 授权陀螺仪</button>
+    </div>
+    <div id="message">🏆 过关!</div>
+    <div class="gyro-tip" id="gyroStatus">⚡ 陀螺仪: 未授权</div>
+
+    <!-- 引入Three.js核心库和扩展 -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- 初始化 Three.js ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x071a3b);
+        scene.fog = new THREE.FogExp2(0x071a3b, 0.008);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(8, 6, 12);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        
+        // 辅助光照
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        dirLight.receiveShadow = false;
+        scene.add(dirLight);
+        const backLight = new THREE.PointLight(0x4466cc, 0.5);
+        backLight.position.set(-2, 3, -4);
+        scene.add(backLight);
+        const fillLight = new THREE.PointLight(0xffaa66, 0.3);
+        fillLight.position.set(3, 2, 4);
+        scene.add(fillLight);
+        
+        // 辅助网格地面 (装饰)
+        const gridHelper = new THREE.GridHelper(30, 20, 0x88aaff, 0x335588);
+        gridHelper.position.y = -1.2;
+        scene.add(gridHelper);
+        
+        // --- 物理世界 ---
+        const world = new CANNON.World();
+        world.gravity = new CANNON.Vec3(0, -12, 0);
+        world.broadphase = new CANNON.NaiveBroadphase();
+        world.defaultContactMaterial.restitution = 0.5;
+        
+        // 小球物理材质
+        const ballMaterial = new CANNON.Material('ball');
+        const groundMaterial = new CANNON.Material('ground');
+        const contactMaterial = new CANNON.ContactMaterial(ballMaterial, groundMaterial, {
+            friction: 0.4,
+            restitution: 0.6,
+            contactEquationStiffness: 1e8,
+        });
+        world.addContactMaterial(contactMaterial);
+        world.defaultContactMaterial.material1 = ballMaterial;
+        world.defaultContactMaterial.material2 = groundMaterial;
+        
+        // 小球体
+        const ballRadius = 0.48;
+        const ballBody = new CANNON.Body({
+            mass: 1,
+            material: ballMaterial,
+            shape: new CANNON.Sphere(ballRadius),
+            position: new CANNON.Vec3(0, 1, 0)
+        });
+        ballBody.linearDamping = 0.2;
+        ballBody.angularDamping = 0.1;
+        world.addBody(ballBody);
+        
+        // 视觉小球
+        const ballMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(ballRadius, 64, 64),
+            new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.3, metalness: 0.7, emissive: 0x441100 })
+        );
+        ballMesh.castShadow = true;
+        ballMesh.receiveShadow = true;
+        scene.add(ballMesh);
+        
+        // 死亡触发器 (Y轴检测)
+        const deathY = -2.5;
+        
+        // --- 游戏状态 ---
+        let currentLevel = 0;      // 0-index
+        let levelPassed = false;
+        let gameActive = true;
+        let pendingNext = false;
+        let levelObjects = [];      // 存储 { visual: THREE.Object3D, body: CANNON.Body, isMoving: bool, moveData: any }
+        let movingPlatforms = [];
+        let endTriggerBody = null;
+        let currentStartPos = new CANNON.Vec3(0, 1, 0);
+        
+        // 陀螺仪相关
+        let gyroBeta = 0, gyroGamma = 0;
+        let gyroEnabled = false;
+        let calibrationBeta = 0, calibrationGamma = 0;
+        let sensitivity = 1.0;
+        const forceStrength = 18.0;  // 倾斜施加力系数
+        
+        // UI元素
+        const levelNumSpan = document.getElementById('level-num');
+        const levelStatusSpan = document.getElementById('level-status');
+        const messageDiv = document.getElementById('message');
+        const resetBtn = document.getElementById('resetBtn');
+        const calibrateBtn = document.getElementById('calibrateBtn');
+        const sensSlider = document.getElementById('sensSlider');
+        const gyroBtn = document.getElementById('gyroBtn');
+        const gyroStatusSpan = document.getElementById('gyroStatus');
+        
+        // 相机跟随平滑
+        let cameraOffset = new THREE.Vector3(-5, 5, 7);
+        
+        // --- 辅助函数: 清除关卡物体 ---
+        function clearLevelObjects() {
+            for (let obj of levelObjects) {
+                if (obj.visual) scene.remove(obj.visual);
+                if (obj.body && world.bodies.includes(obj.body)) world.removeBody(obj.body);
+            }
+            if (endTriggerBody && world.bodies.includes(endTriggerBody)) world.removeBody(endTriggerBody);
+            endTriggerBody = null;
+            levelObjects = [];
+            movingPlatforms = [];
+        }
+        
+        // 显示短暂消息
+        function showMessage(text, isError = false) {
+            messageDiv.style.opacity = '1';
+            messageDiv.textContent = text;
+            messageDiv.style.color = isError ? '#ff8888' : '#ffdd88';
+            messageDiv.style.borderColor = isError ? '#ff5555' : '#ffcc44';
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+            }, 1800);
+        }
+        
+        // 重置当前关卡 (小球复位，移动平台复位)
+        function resetLevel() {
+            if (!gameActive) return;
+            // 重置小球位置与速度
+            ballBody.position.copy(currentStartPos);
+            ballBody.velocity.set(0, 0, 0);
+            ballBody.angularVelocity.set(0, 0, 0);
+            // 重置移动平台位置
+            for (let mp of movingPlatforms) {
+                if (mp.moveData && mp.body) {
+                    const initPos = mp.moveData.initPos.clone();
+                    mp.body.position.copy(initPos);
+                    if (mp.visual) mp.visual.position.copy(initPos);
+                    mp.moveData.time = 0;
+                }
+            }
+            showMessage("↺ 重新开始本关", false);
+        }
+        
+        // 过关
+        function levelComplete() {
+            if (levelPassed) return;
+            levelPassed = true;
+            gameActive = false;
+            showMessage(`✨ 过关！ ${currentLevel+1 === 5 ? '最终胜利!' : '进入下一关'} ✨`, false);
+            if (currentLevel + 1 === 5) {
+                setTimeout(() => {
+                    showMessage("🎉 恭喜通关！ 🎉", false);
+                    gameActive = true; // 允许重置玩，但不再自动跳关
+                }, 1000);
+                return;
+            }
+            setTimeout(() => {
+                nextLevel();
+            }, 1500);
+        }
+        
+        function nextLevel() {
+            if (currentLevel + 1 < 5) {
+                currentLevel++;
+                loadLevel(currentLevel);
+                levelPassed = false;
+                gameActive = true;
+                pendingNext = false;
+            } else {
+                // 已经是最后一关，胜利后保持
+                gameActive = true;
+            }
+        }
+        
+        // --- 定义5个关卡生成器 (返回起点位置, 终点位置Vec3, 以及移动平台数组(可选))---
+        // 通用添加路面块函数
+        function addBlock(x, y, z, width, depth, height, color, rotY = 0) {
+            const boxShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+            const body = new CANNON.Body({ mass: 0, material: groundMaterial });
+            body.addShape(boxShape);
+            body.position.set(x, y, z);
+            if (rotY) {
+                body.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), rotY);
+            }
+            world.addBody(body);
+            
+            const visual = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, depth),
+                new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.1 })
+            );
+            visual.position.set(x, y, z);
+            visual.rotation.y = rotY;
+            visual.castShadow = true;
+            visual.receiveShadow = true;
+            scene.add(visual);
+            levelObjects.push({ visual, body, isMoving: false });
+            return body;
+        }
+        
+        // 添加终点触发器
+        function addEndTrigger(posX, posY, posZ, sizeX = 1.2, sizeZ = 1.2) {
+            const triggerShape = new CANNON.Box(new CANNON.Vec3(sizeX/2, 0.2, sizeZ/2));
+            const triggerBody = new CANNON.Body({ mass: 0, isTrigger: true, material: groundMaterial });
+            triggerBody.addShape(triggerShape);
+            triggerBody.position.set(posX, posY, posZ);
+            world.addBody(triggerBody);
+            // 视觉终点标志
+            const flagPole = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08, 0.12, 0.8, 6),
+                new THREE.MeshStandardMaterial({ color: 0xdd8866 })
+            );
+            flagPole.position.set(posX, posY + 0.4, posZ);
+            scene.add(flagPole);
+            const flag = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 0.1, 0.02),
+                new THREE.MeshStandardMaterial({ color: 0xff3333 })
+            );
+            flag.position.set(posX + 0.25, posY + 0.65, posZ);
+            scene.add(flag);
+            levelObjects.push({ visual: flagPole, body: null });
+            levelObjects.push({ visual: flag, body: null });
+            return triggerBody;
+        }
+        
+        // 关卡1: 直线
+        function buildLevel1() {
+            const start = new CANNON.Vec3(-6, 0.2, 0);
+            const blocks = [];
+            for (let i = -6; i <= 7; i += 0.9) {
+                const block = addBlock(i, 0.1, 0, 0.9, 1.4, 0.2, 0x6a9e6a);
+                blocks.push(block);
+            }
+            const endBody = addEndTrigger(7.2, 0.2, 0, 1.0, 1.2);
+            return { start, endBody, movingPlats: [] };
+        }
+        
+        // 关卡2: S弯 (沿曲线)
+        function buildLevel2() {
+            const start = new CANNON.Vec3(-6, 0.2, 0);
+            const points = [];
+            for (let t = 0; t <= 1; t += 0.07) {
+                const x = -6 + t * 13;
+                const z = Math.sin(t * Math.PI * 2) * 2.2;
+                points.push({x, z});
+            }
+            for (let p of points) {
+                addBlock(p.x, 0.1, p.z, 0.85, 0.85, 0.2, 0x5a7d9a);
+            }
+            const endPos = points[points.length-1];
+            const endBody = addEndTrigger(endPos.x, 0.2, endPos.z, 1.0, 1.2);
+            return { start, endBody, movingPlats: [] };
+        }
+        
+        // 关卡3: 上下坡
+        function buildLevel3() {
+            const start = new CANNON.Vec3(-7, 0.2, 0);
+            for (let i = -7; i <= 7; i += 0.85) {
+                let yOff = 0;
+                if (i < -2) yOff = (i + 7) * 0.22;       // 上坡
+                else if (i > 2) yOff = (7 - i) * 0.22;    // 下坡
+                else yOff = 1.0;
+                addBlock(i, yOff + 0.1, 0, 0.85, 1.2, 0.2, 0xc9a87c);
+            }
+            const endBody = addEndTrigger(7.2, 0.2, 0, 1.0, 1.2);
+            return { start, endBody, movingPlats: [] };
+        }
+        
+        // 关卡4: 窄道 + 移动平台
+        function buildLevel4() {
+            const start = new CANNON.Vec3(-6, 0.2, 0);
+            // 固定窄道
+            for (let i = -6; i <= -1.5; i += 0.8) {
+                addBlock(i, 0.1, 0, 0.8, 0.9, 0.2, 0x88aadd);
+            }
+            // 移动平台: 3个，水平移动或上下移动
+            const movers = [];
+            const moves = [
+                { initX: 0, initZ: 0, rangeX: 1.8, rangeY: 0, speed: 1.2, type: 'x' },
+                { initX: 2.2, initZ: 0, rangeX: 0, rangeY: 0.8, speed: 1.0, type: 'y' },
+                { initX: 4.5, initZ: 0, rangeX: 1.5, rangeY: 0, speed: 1.5, type: 'x' }
+            ];
+            for (let idx=0; idx<moves.length; idx++) {
+                const m = moves[idx];
+                const shape = new CANNON.Box(new CANNON.Vec3(0.6, 0.1, 0.6));
+                const body = new CANNON.Body({ mass: 0, material: groundMaterial });
+                body.addShape(shape);
+                const startX = m.initX;
+                const startY = 0.2 + (m.type==='y'?0:0);
+                const startZ = m.initZ;
+                body.position.set(startX, startY, startZ);
+                world.addBody(body);
+                const visual = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.2, 0.2, 1.2),
+                    new THREE.MeshStandardMaterial({ color: 0xffaa66, emissive: 0x442200 })
+                );
+                visual.position.set(startX, startY, startZ);
+                scene.add(visual);
+                levelObjects.push({ visual, body, isMoving: true });
+                movers.push({
+                    body, visual,
+                    moveData: { initPos: new CANNON.Vec3(startX, startY, startZ), rangeX: m.rangeX, rangeY: m.rangeY, speed: m.speed, time: 0, type: m.type }
+                });
+            }
+            // 最后固定平台连接终点
+            addBlock(6.2, 0.1, 0, 0.9, 1.0, 0.2, 0x88aadd);
+            const endBody = addEndTrigger(7.0, 0.2, 0, 1.0, 1.2);
+            return { start, endBody, movingPlats: movers };
+        }
+        
+        // 关卡5: 螺旋塔
+        function buildLevel5() {
+            const start = new CANNON.Vec3(0, 0.2, 3.5);
+            const angleStep = 0.28;
+            let angle = 0;
+            let yOffset = 0;
+            let radius = 3.2;
+            const blocksPos = [];
+            for (let step = 0; step < 38; step++) {
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                const y = yOffset + 0.1;
+                addBlock(x, y, z, 0.85, 0.85, 0.2, 0xaa88dd);
+                blocksPos.push({x,y,z});
+                angle += angleStep;
+                if (step % 6 === 0) radius -= 0.12;
+                yOffset += 0.13;
+                if (radius < 0.8) radius = 0.8;
+            }
+            // 终点高台
+            addBlock(0, yOffset+0.2, 0, 1.2, 1.2, 0.3, 0xffaa55);
+            const endBody = addEndTrigger(0, yOffset+0.35, 0, 1.2, 1.2);
+            return { start, endBody, movingPlats: [] };
+        }
+        
+        // 加载关卡
+        function loadLevel(levelIdx) {
+            clearLevelObjects();
+            let result;
+            switch(levelIdx) {
+                case 0: result = buildLevel1(); levelStatusSpan.textContent = "🏁 直线初体验"; break;
+                case 1: result = buildLevel2(); levelStatusSpan.textContent = "🌀 S形弯道"; break;
+                case 2: result = buildLevel3(); levelStatusSpan.textContent = "⛰️ 上下坡"; break;
+                case 3: result = buildLevel4(); levelStatusSpan.textContent = "⚙️ 移动平台+窄道"; break;
+                case 4: result = buildLevel5(); levelStatusSpan.textContent = "🏰 螺旋塔"; break;
+                default: result = buildLevel1();
+            }
+            currentStartPos = result.start.clone();
+            endTriggerBody = result.endBody;
+            ballBody.position.copy(currentStartPos);
+            ballBody.velocity.set(0,0,0);
+            movingPlatforms = result.movingPlats || [];
+            // 存储移动平台更新数据
+            for (let mp of movingPlatforms) {
+                if (mp.moveData) mp.moveData.time = 0;
+            }
+            levelNumSpan.textContent = (levelIdx+1).toString();
+            // 相机稍微调整适应螺旋塔视角
+            if (levelIdx === 4) cameraOffset.set(-4, 5, 6);
+            else cameraOffset.set(-5, 5, 7);
+            showMessage(`第 ${levelIdx+1} 关 开始！`, false);
+            levelPassed = false;
+            gameActive = true;
+        }
+        
+        // --- 陀螺仪逻辑 ---
+        function requestGyroPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            gyroEnabled = true;
+                            gyroStatusSpan.textContent = "✅ 陀螺仪: 已授权";
+                        } else {
+                            gyroStatusSpan.textContent = "❌ 授权失败";
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        gyroStatusSpan.textContent = "⚠️ 无法授权";
+                    });
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                gyroEnabled = true;
+                gyroStatusSpan.textContent = "🎮 陀螺仪: 已启用";
+            }
+        }
+        
+        function handleOrientation(event) {
+            if (!gyroEnabled) return;
+            gyroBeta = event.beta;    // 前后 -180~180
+            gyroGamma = event.gamma;  // 左右 -90~90
+        }
+        
+        function calibrateGyro() {
+            calibrationBeta = gyroBeta || 0;
+            calibrationGamma = gyroGamma || 0;
+            showMessage("水平已校准", false);
+        }
+        
+        // 根据倾斜施加力 (每帧调用)
+        function applyGyroForce() {
+            if (!gameActive || levelPassed) return;
+            let rawBeta = (gyroBeta || 0) - calibrationBeta;
+            let rawGamma = (gyroGamma || 0) - calibrationGamma;
+            // 限制范围
+            let forward = Math.min(Math.max(rawBeta / 45, -1), 1);
+            let right = Math.min(Math.max(rawGamma / 45, -1), 1);
+            const sens = sensitivity;
+            const force = forceStrength * sens;
+            const fx = right * force;
+            const fz = -forward * force;
+            // 施加力
+            ballBody.applyForce(new CANNON.Vec3(fx, 0, fz), ballBody.position);
+        }
+        
+        // 键盘/鼠标备选控制 (PC调试)
+        let keyState = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        window.addEventListener('keydown', (e) => {
+            if (e.key.startsWith('Arrow')) {
+                keyState[e.key] = true;
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key.startsWith('Arrow')) keyState[e.key] = false;
+        });
+        function applyKeyboardForce() {
+            if (!gameActive || levelPassed) return;
+            let fx = 0, fz = 0;
+            if (keyState.ArrowLeft) fx = -12;
+            if (keyState.ArrowRight) fx = 12;
+            if (keyState.ArrowUp) fz = -12;
+            if (keyState.ArrowDown) fz = 12;
+            if (fx !== 0 || fz !== 0) {
+                ballBody.applyForce(new CANNON.Vec3(fx, 0, fz), ballBody.position);
+            }
+        }
+        
+        // 更新移动平台
+        function updateMovingPlatforms(deltaTime) {
+            for (let mp of movingPlatforms) {
+                if (!mp.moveData) continue;
+                const data = mp.moveData;
+                data.time += deltaTime;
+                let t = data.time * data.speed;
+                let newX = data.initPos.x;
+                let newY = data.initPos.y;
+                let newZ = data.initPos.z;
+                if (data.type === 'x') {
+                    const offset = Math.sin(t) * data.rangeX;
+                    newX = data.initPos.x + offset;
+                } else if (data.type === 'y') {
+                    const offset = Math.sin(t) * data.rangeY;
+                    newY = data.initPos.y + offset;
+                }
+                mp.body.position.set(newX, newY, newZ);
+                if (mp.visual) mp.visual.position.set(newX, newY, newZ);
+            }
+        }
+        
+        // 终点碰撞检测
+        function checkEndTrigger() {
+            if (!endTriggerBody || levelPassed || !gameActive) return;
+            const dist = ballBody.position.distanceTo(endTriggerBody.position);
+            if (dist < 0.9) {
+                levelComplete();
+            }
+        }
+        
+        // 死亡检测
+        function checkDeath() {
+            if (levelPassed || !gameActive) return;
+            if (ballBody.position.y < deathY) {
+                gameActive = false;
+                showMessage("💀 掉落虚空，重新开始...", true);
+                setTimeout(() => {
+                    resetLevel();
+                    gameActive = true;
+                }, 800);
+            }
+        }
+        
+        // 相机跟随
+        function updateCamera() {
+            const targetPos = ballMesh.position.clone();
+            const desiredPos = targetPos.clone().add(cameraOffset);
+            camera.position.lerp(desiredPos, 0.05);
+            camera.lookAt(targetPos);
+        }
+        
+        // 动画循环 & 物理同步
+        let lastTime = performance.now();
+        function animate() {
+            const now = performance.now();
+            let dt = Math.min(1/30, (now - lastTime) / 1000);
+            lastTime = now;
+            
+            // 物理步进
+            world.step(1 / 60, dt, 3);
+            
+            // 控制力
+            if (gyroEnabled) applyGyroForce();
+            applyKeyboardForce();
+            
+            // 更新移动平台
+            updateMovingPlatforms(dt);
+            
+            // 死亡和胜利检测
+            checkDeath();
+            checkEndTrigger();
+            
+            // 同步小球视觉
+            ballMesh.position.copy(ballBody.position);
+            ballMesh.quaternion.copy(ballBody.quaternion);
+            
+            // 相机跟随
+            updateCamera();
+            
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        
+        // 事件绑定
+        resetBtn.addEventListener('click', () => {
+            if (!gameActive && levelPassed) {
+                // 如果胜利后手动重置，重新加载当前关卡
+                loadLevel(currentLevel);
+            } else {
+                resetLevel();
+            }
+        });
+        calibrateBtn.addEventListener('click', calibrateGyro);
+        sensSlider.addEventListener('input', (e) => { sensitivity = parseFloat(e.target.value); });
+        gyroBtn.addEventListener('click', requestGyroPermission);
+        
+        // 启动游戏
+        loadLevel(0);
+        animate();
+        
+        // 窗口适配
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // 模拟陀螺仪未授权时的提示
+        setTimeout(() => {
+            if (!gyroEnabled) {
+                gyroStatusSpan.innerHTML = "📱 点击授权陀螺仪";
+            }
+        }, 500);
+        
+        // 增加一个小指示标
+        console.log("游戏已启动，倾斜手机控制小球，PC可用方向键");
+    </script>
+</body>
+</html>
