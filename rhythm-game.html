@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>节奏拍击 - 太鼓达人风格 | 内置背景音乐</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', system-ui, sans-serif;
+            touch-action: manipulation;
+        }
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 1200px;
+            max-height: 800px;
+            background: #0a0c1a;
+            border-radius: 32px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .status-bar {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-weight: bold;
+            color: #ffdd99;
+            border-bottom: 1px solid #ffaa4433;
+        }
+        .score-box, .combo-box, .accuracy-box {
+            background: #00000066;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-size: 1.2rem;
+        }
+        .combo-box { color: #ffaa66; text-shadow: 0 0 5px #ff6600; }
+        .game-canvas { flex: 1; background: #121524; position: relative; cursor: pointer; }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 30%, #1e2538, #0b0e17);
+        }
+        .control-bar {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(12px);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            border-top: 1px solid #ffaa4444;
+        }
+        .mic-status { background: #2a2a3a; padding: 5px 12px; border-radius: 30px; font-size: 12px; color: #88ffaa; }
+        button {
+            background: #ff8844;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            color: #1e1e2e;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:active { transform: scale(0.96); }
+        .volume-meter { width: 120px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+        .volume-fill { width: 0%; height: 100%; background: #ffaa44; transition: width 0.05s linear; }
+        .calibration-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(15px);
+            z-index: 20;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+            gap: 20px;
+            padding: 20px;
+        }
+        .calibration-step { background: #2a2a3a; padding: 25px; border-radius: 48px; max-width: 280px; }
+        .judge-text {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: gold;
+            text-shadow: 0 0 10px orange;
+            left: 50%;
+            top: 35%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 12;
+            animation: fadeUp 0.5s ease-out forwards;
+        }
+        @keyframes fadeUp {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+            100% { opacity: 0; transform: translate(-50%, -80%) scale(1.2); }
+        }
+        @keyframes flashRed { 0% { background: rgba(255,80,80,0); } 20% { background: rgba(255,80,80,0.5); } 100% { background: rgba(255,80,80,0); } }
+        @keyframes flashBlue { 0% { background: rgba(80,150,255,0); } 20% { background: rgba(80,150,255,0.5); } 100% { background: rgba(80,150,255,0); } }
+        .flash-red { animation: flashRed 0.2s ease-out; }
+        .flash-blue { animation: flashBlue 0.2s ease-out; }
+        @media (max-width: 700px) {
+            .score-box, .combo-box, .accuracy-box { font-size: 0.9rem; padding: 4px 10px; }
+            .judge-text { font-size: 1.8rem; top: 30%; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="gameContainer">
+    <div class="status-bar">
+        <div class="score-box">🎵 得分: <span id="scoreValue">0</span></div>
+        <div class="combo-box">⚡ 连击: <span id="comboValue">0</span></div>
+        <div class="accuracy-box">🎯 准确: <span id="accuracyValue">0</span>%</div>
+    </div>
+    <div class="game-canvas"><canvas id="rhythmCanvas" width="1000" height="500" style="width:100%; height:100%;"></canvas></div>
+    <div class="control-bar">
+        <div class="mic-status">🎤 <span id="micState">未授权</span></div>
+        <div class="volume-meter"><div class="volume-fill" id="volumeFill"></div></div>
+        <button id="resetGameBtn">🔄 重玩</button>
+        <button id="toggleMusicBtn">🔊 音乐开</button>
+    </div>
+    <div id="calibrationOverlay" class="calibration-overlay">
+        <div class="calibration-step" id="calibStep1">
+            <h2>🎤 麦克风校准</h2>
+            <p>需要检测你拍击手机背面的声音。</p>
+            <button id="requestMicBtn">🎙️ 允许麦克风</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    // ----- 游戏配置 -----
+    const NOTE_SPEED = 280;
+    const JUDGE_WINDOW_GOOD = 0.08;
+    const JUDGE_WINDOW_OK = 0.15;
+    const COOLDOWN_MS = 200;
+    
+    // 谱面 (时间秒, 类型)
+    const songNotes = [
+        { time: 0.5, type: 'red' }, { time: 1.0, type: 'red' }, { time: 1.5, type: 'blue' },
+        { time: 2.0, type: 'red' }, { time: 2.5, type: 'red' }, { time: 3.0, type: 'blue' },
+        { time: 3.5, type: 'red' }, { time: 4.0, type: 'blue' }, { time: 4.5, type: 'red' },
+        { time: 5.0, type: 'red' }, { time: 5.5, type: 'blue' }, { time: 6.0, type: 'red' },
+        { time: 6.5, type: 'blue' }, { time: 7.0, type: 'red' }, { time: 7.5, type: 'red' },
+        { time: 8.0, type: 'blue' }, { time: 8.5, type: 'red' }, { time: 9.0, type: 'red' },
+        { time: 9.5, type: 'blue' }, { time: 10.0, type: 'red' }
+    ];
+    const TOTAL_NOTES = songNotes.length;
+    
+    let gameActive = false;
+    let startTime = 0;              // performance基准，与音乐同步
+    let currentNotes = [];
+    let score = 0, combo = 0, totalHit = 0, perfectHit = 0;
+    let lastHitTime = 0;
+    let animationId = null;
+    let canvas, ctx;
+    
+    // 麦克风相关
+    let mediaStream = null;
+    let audioContext = null;
+    let analyserNode = null;
+    let micEnabled = false;
+    let threshold = 0.35;
+    let backgroundNoise = 0.12;
+    let calibrationDone = false;
+    
+    // 背景音乐相关
+    let musicEnabled = true;
+    let musicSource = null;
+    let musicGain = null;
+    let musicStarted = false;
+    let musicStartTime = 0;          // audioContext.currentTime 开始时刻
+    
+    // UI 元素
+    const scoreSpan = document.getElementById('scoreValue');
+    const comboSpan = document.getElementById('comboValue');
+    const accuracySpan = document.getElementById('accuracyValue');
+    const volumeFillDiv = document.getElementById('volumeFill');
+    const micStateSpan = document.getElementById('micState');
+    const resetBtn = document.getElementById('resetGameBtn');
+    const toggleMusicBtn = document.getElementById('toggleMusicBtn');
+    const calibrationOverlay = document.getElementById('calibrationOverlay');
+    
+    function updateUI() {
+        scoreSpan.innerText = score;
+        comboSpan.innerText = combo;
+        let acc = totalHit === 0 ? 0 : (perfectHit / totalHit * 100);
+        accuracySpan.innerText = acc.toFixed(1);
+    }
+    
+    function showJudgeText(judge, type) {
+        const div = document.createElement('div');
+        div.className = 'judge-text';
+        let textColor = '#ffcc44';
+        if (judge === '良') textColor = '#ffaa33';
+        else if (judge === '可') textColor = '#88ffaa';
+        else textColor = '#ff6666';
+        div.innerText = judge === 'miss' ? 'Miss' : judge;
+        div.style.color = textColor;
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 500);
+    }
+    
+    function flashScreen(type) {
+        const flashDiv = document.createElement('div');
+        flashDiv.style.position = 'fixed';
+        flashDiv.style.top = 0;
+        flashDiv.style.left = 0;
+        flashDiv.style.width = '100%';
+        flashDiv.style.height = '100%';
+        flashDiv.style.pointerEvents = 'none';
+        flashDiv.style.zIndex = 100;
+        flashDiv.style.background = type === 'red' ? 'radial-gradient(circle, rgba(255,80,80,0.6), transparent)' : 'radial-gradient(circle, rgba(80,150,255,0.6), transparent)';
+        document.body.appendChild(flashDiv);
+        setTimeout(() => flashDiv.remove(), 150);
+    }
+    
+    function playHitSound(quality) {
+        if (!audioContext) return;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        const now = audioContext.currentTime;
+        if (quality === 'good') {
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+            osc.start(); osc.stop(now + 0.2);
+        } else if (quality === 'ok') {
+            osc.frequency.value = 660;
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+            osc.start(); osc.stop(now + 0.15);
+        } else {
+            const noise = audioContext.createBufferSource();
+            const bufferSize = 4096;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            noise.buffer = buffer;
+            const noiseGain = audioContext.createGain();
+            noise.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
+            noiseGain.gain.setValueAtTime(0.08, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+            noise.start(); noise.stop(now + 0.1);
+        }
+    }
+    
+    function onHit(gameTimeSec) {
+        const now = performance.now();
+        if (!gameActive) return;
+        if (now - lastHitTime < COOLDOWN_MS) return;
+        lastHitTime = now;
+        
+        let bestNote = null, bestDelta = Infinity;
+        for (let n of currentNotes) {
+            if (n.judged) continue;
+            const delta = Math.abs(gameTimeSec - n.time);
+            if (delta < bestDelta) { bestDelta = delta; bestNote = n; }
+        }
+        if (!bestNote) return;
+        
+        let judgement = null;
+        if (bestDelta <= JUDGE_WINDOW_GOOD) {
+            judgement = '良';
+            score += 100 + Math.floor(combo / 10) * 5;
+            perfectHit++;
+            combo++;
+        } else if (bestDelta <= JUDGE_WINDOW_OK) {
+            judgement = '可';
+            score += 50;
+            combo++;
+            perfectHit++;
+        } else {
+            judgement = 'miss';
+            combo = 0;
+        }
+        if (judgement !== 'miss') totalHit++;
+        bestNote.judged = true;
+        showJudgeText(judgement, bestNote.type);
+        flashScreen(bestNote.type);
+        playHitSound(judgement === '良' ? 'good' : (judgement === '可' ? 'ok' : 'miss'));
+        updateUI();
+        setTimeout(() => { currentNotes = currentNotes.filter(n => !n.judged); }, 10);
+    }
+    
+    // ----- 合成背景音乐 (简单旋律循环) -----
+    function createBackgroundMusic() {
+        if (!audioContext) return;
+        // 停止旧音乐
+        if (musicSource) {
+            try { musicSource.stop(); } catch(e) {}
+            musicSource = null;
+        }
+        if (!musicEnabled) return;
+        
+        const now = audioContext.currentTime;
+        musicGain = audioContext.createGain();
+        musicGain.gain.value = 0.25;  // 音量低于反馈音效
+        musicGain.connect(audioContext.destination);
+        
+        // 简单的旋律: 使用多个振荡器按时间表播放
+        // 定义音符序列 (频率, 持续时间, 起始偏移)
+        const melody = [
+            { freq: 523.25, dur: 0.4, start: 0.0 },  // C5
+            { freq: 587.33, dur: 0.4, start: 0.5 },  // D5
+            { freq: 659.25, dur: 0.4, start: 1.0 },  // E5
+            { freq: 523.25, dur: 0.8, start: 1.5 },  // C5
+            { freq: 523.25, dur: 0.4, start: 2.5 },  // C5
+            { freq: 587.33, dur: 0.4, start: 3.0 },  // D5
+            { freq: 659.25, dur: 0.4, start: 3.5 },  // E5
+            { freq: 523.25, dur: 0.8, start: 4.0 },  // C5
+            { freq: 392.00, dur: 0.4, start: 5.0 },  // G4
+            { freq: 440.00, dur: 0.4, start: 5.5 },  // A4
+            { freq: 493.88, dur: 0.8, start: 6.0 },  // B4
+            { freq: 523.25, dur: 0.8, start: 7.0 },  // C5
+        ];
+        // 循环播放
+        let loopStartTime = now;
+        function scheduleLoop() {
+            const nowTime = audioContext.currentTime;
+            const loopLen = 8.0; // 8秒循环
+            const elapsed = (nowTime - loopStartTime) % loopLen;
+            // 调度未来2秒内的音符
+            for (let note of melody) {
+                let noteTime = loopStartTime + note.start;
+                while (noteTime < nowTime + 2.0) {
+                    if (noteTime >= nowTime - 0.1) {
+                        const osc = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        osc.type = 'square';
+                        osc.frequency.value = note.freq;
+                        gainNode.gain.value = 0.2;
+                        gainNode.gain.exponentialRampToValueAtTime(0.0001, noteTime + note.dur);
+                        osc.connect(gainNode);
+                        gainNode.connect(musicGain);
+                        osc.start(noteTime);
+                        osc.stop(noteTime + note.dur);
+                    }
+                    noteTime += loopLen;
+                }
+            }
+            requestAnimationFrame(() => setTimeout(scheduleLoop, 1000));
+        }
+        scheduleLoop();
+    }
+    
+    function toggleMusic() {
+        musicEnabled = !musicEnabled;
+        if (musicEnabled) {
+            createBackgroundMusic();
+            toggleMusicBtn.innerText = '🔊 音乐开';
+        } else {
+            if (musicGain) musicGain.gain.value = 0;
+            toggleMusicBtn.innerText = '🔇 音乐关';
+        }
+    }
+    
+    // ----- 麦克风音量检测 -----
+    function startMicMonitoring() {
+        if (!analyserNode || !audioContext) return;
+        const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+        function detect() {
+            if (!gameActive && calibrationDone) return;
+            if (!analyserNode) return;
+            analyserNode.getByteTimeDomainData(dataArray);
+            let max = 0;
+            for (let i=0; i<dataArray.length; i++) {
+                const v = Math.abs((dataArray[i]-128)/128);
+                if (v>max) max=v;
+            }
+            let volume = Math.min(1, max*1.5);
+            volumeFillDiv.style.width = (volume*100)+'%';
+            if (gameActive && calibrationDone && volume > threshold && volume > backgroundNoise+0.12) {
+                const now = performance.now();
+                if (now - lastHitTime > COOLDOWN_MS && startTime > 0) {
+                    const gameTime = (performance.now() - startTime) / 1000;
+                    onHit(gameTime);
+                }
+            }
+            requestAnimationFrame(detect);
+        }
+        detect();
+    }
+    
+    // ----- 校准流程 -----
+    async function startCalibration() {
+        calibrationOverlay.style.display = 'flex';
+        const step1Div = document.getElementById('calibStep1');
+        step1Div.innerHTML = `<h2>🎤 第一步: 环境安静</h2><p>请保持安静2秒，测量背景噪音...</p><div class="volume-meter" style="width:200px; margin:10px auto;"><div id="calibMeter" style="width:0%;height:100%;background:#ffaa44;"></div></div><p id="calibStatus">测量中...</p>`;
+        let samples = [];
+        for (let i=0;i<30;i++) {
+            await new Promise(r=>setTimeout(r,80));
+            if (analyserNode) {
+                const data = new Uint8Array(analyserNode.frequencyBinCount);
+                analyserNode.getByteTimeDomainData(data);
+                let max=0;
+                for(let j=0;j<data.length;j++) max=Math.max(max, Math.abs((data[j]-128)/128));
+                samples.push(max);
+                const meter=document.getElementById('calibMeter');
+                if(meter) meter.style.width=(max*100)+'%';
+            }
+        }
+        backgroundNoise = samples.reduce((a,b)=>a+b,0)/samples.length;
+        step1Div.innerHTML = `<h2>👏 第二步: 拍击测试</h2><p>请用力拍击手机背面一次 (或桌面) 以设定灵敏度</p><div class="volume-meter" style="width:200px; margin:10px auto;"><div id="hitMeter" style="width:0%;height:100%;background:#ff8844;"></div></div><p id="hitStatus">等待拍击...</p><button id="skipCalibBtn">跳过校准(使用默认)</button>`;
+        let hitSamples=[], hitDetected=false;
+        const meterInterval = setInterval(()=>{
+            if(!analyserNode) return;
+            const data=new Uint8Array(analyserNode.frequencyBinCount);
+            analyserNode.getByteTimeDomainData(data);
+            let max=0;
+            for(let j=0;j<data.length;j++) max=Math.max(max, Math.abs((data[j]-128)/128));
+            const meterDiv=document.getElementById('hitMeter');
+            if(meterDiv) meterDiv.style.width=(max*100)+'%';
+            if(max>0.45 && !hitDetected){
+                hitSamples.push(max);
+                if(hitSamples.length>3){
+                    hitDetected=true;
+                    const peak=Math.max(...hitSamples);
+                    threshold=Math.max(0.35, peak*0.75);
+                    document.getElementById('hitStatus').innerHTML=`✅ 检测到拍击! 阈值设为 ${threshold.toFixed(2)}<br>游戏即将开始...`;
+                    clearInterval(meterInterval);
+                    setTimeout(()=>{
+                        calibrationDone=true;
+                        calibrationOverlay.style.display='none';
+                        gameActive=true;
+                        startGameSession();
+                    },1000);
+                }
+            }
+        },60);
+        document.getElementById('skipCalibBtn')?.addEventListener('click',()=>{
+            clearInterval(meterInterval);
+            threshold=0.45;
+            calibrationDone=true;
+            calibrationOverlay.style.display='none';
+            gameActive=true;
+            startGameSession();
+        });
+    }
+    
+    // ----- 游戏开始（重置数据，启动音乐同步）-----
+    function startGameSession() {
+        resetGameData();
+        // 启动背景音乐（如果已启用）
+        if (musicEnabled && audioContext && !musicStarted) {
+            musicStarted = true;
+            createBackgroundMusic();
+        }
+        // 游戏开始时间与 performance 对齐
+        startTime = performance.now() + 500;
+        gameActive = true;
+        currentNotes = songNotes.map(n => ({ time: n.time, type: n.type, judged: false }));
+        if (animationId) cancelAnimationFrame(animationId);
+        function drawLoop() {
+            drawCanvas();
+            animationId = requestAnimationFrame(drawLoop);
+        }
+        drawLoop();
+    }
+    
+    function resetGameData() {
+        score = 0; combo = 0; totalHit = 0; perfectHit = 0;
+        updateUI();
+        gameActive = true;
+        startTime = performance.now() + 200;
+        currentNotes = songNotes.map(n => ({ time: n.time, type: n.type, judged: false }));
+    }
+    
+    function drawCanvas() {
+        if (!canvas) return;
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0,0,w,h);
+        const judgeLineX = w * 0.2;
+        ctx.beginPath();
+        ctx.strokeStyle = '#ffcc88';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([8,12]);
+        ctx.moveTo(judgeLineX,30);
+        ctx.lineTo(judgeLineX,h-30);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = 'bold 20px monospace';
+        ctx.fillStyle = '#ffaa66';
+        ctx.fillText('⚡ 判定线', judgeLineX-70, 50);
+        const now = (performance.now() - startTime) / 1000;
+        for (let note of currentNotes) {
+            if (note.judged) continue;
+            const timeDiff = note.time - now;
+            const xPos = judgeLineX + timeDiff * NOTE_SPEED;
+            if (xPos < -80 || xPos > w+100) continue;
+            const yCenter = h/2;
+            const radius = 28;
+            if (note.type === 'red') {
+                ctx.fillStyle = '#ff5555';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.arc(xPos, yCenter, radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = 'white';
+                ctx.font = '28px "Segoe UI"';
+                ctx.fillText('咚', xPos-15, yCenter+10);
+            } else {
+                ctx.fillStyle = '#5599ff';
+                ctx.beginPath();
+                ctx.arc(xPos, yCenter, radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = 'white';
+                ctx.font = '28px "Segoe UI"';
+                ctx.fillText('咔', xPos-15, yCenter+10);
+            }
+            ctx.shadowBlur = 0;
+        }
+        ctx.fillStyle = '#dddddd';
+        ctx.font = '14px monospace';
+        ctx.fillText('👏 拍击手机背面', w-130, h-20);
+    }
+    
+    // ----- 麦克风初始化 -----
+    async function initMicrophone() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStream = stream;
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            sourceNode = audioContext.createMediaStreamSource(stream);
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 256;
+            sourceNode.connect(analyserNode);
+            await audioContext.resume();
+            micEnabled = true;
+            micStateSpan.innerText = '已授权';
+            startMicMonitoring();
+            startCalibration();
+        } catch(err) {
+            micStateSpan.innerText = '失败';
+            alert('无法获取麦克风权限，游戏无法检测拍击。请检查权限并刷新重试。');
+        }
+    }
+    
+    // 事件绑定
+    resetBtn.addEventListener('click', () => {
+        if (gameActive) {
+            gameActive = false;
+            setTimeout(() => { resetGameData(); startGameSession(); }, 50);
+        } else { resetGameData(); startGameSession(); }
+    });
+    toggleMusicBtn.addEventListener('click', toggleMusic);
+    document.getElementById('requestMicBtn')?.addEventListener('click', initMicrophone);
+    
+    // canvas 初始化
+    canvas = document.getElementById('rhythmCanvas');
+    ctx = canvas.getContext('2d');
+    function resizeCanvas() {
+        const container = canvas.parentElement;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        canvas.width = Math.max(800, w);
+        canvas.height = Math.max(400, h);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    calibrationOverlay.style.display = 'flex';
+</script>
+</body>
+</html>
