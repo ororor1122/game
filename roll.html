@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>陀螺仪飞行器 - 空中竞速</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Poppins', sans-serif;
+        }
+        /* UI 面板 */
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+            z-index: 10;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .panel {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 30px;
+            padding: 8px 18px;
+            color: #ffefc0;
+            font-weight: bold;
+            font-family: monospace;
+            pointer-events: auto;
+            border: 1px solid #ffaa66;
+        }
+        .score-board {
+            display: flex;
+            gap: 20px;
+        }
+        .speed-meter {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 30px;
+            padding: 8px 18px;
+            color: #88ffaa;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        .controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #ccc;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        button {
+            background: #ffaa44;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+            pointer-events: auto;
+        }
+        .message {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(15px);
+            padding: 20px 40px;
+            border-radius: 50px;
+            color: gold;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 2px solid #ffaa44;
+        }
+        @media (max-width: 600px) {
+            .panel { font-size: 12px; padding: 6px 12px; }
+            .message { font-size: 20px; padding: 12px 24px; white-space: nowrap; }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="panel score-board">
+            <span>⭐ 得分: <span id="scoreValue">0</span></span>
+            <span>🏆 目标: <span id="targetValue">0</span></span>
+        </div>
+        <div class="speed-meter">
+            🚀 速度: <span id="speedValue">0</span> km/h
+        </div>
+        <div class="panel">
+            <button id="resetBtn">🔄 重来</button>
+            <button id="calibrateBtn">🎯 校准水平</button>
+        </div>
+    </div>
+    <div id="message" class="message"></div>
+    <div class="controls-info">📱 倾斜手机控制方向 | 前倾加速 / 后仰减速 | 穿过圆环 + 收集星星</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ---------- 游戏配置 ----------
+        const GAME_SPEED_BASE = 8.0;      // 基础速度系数
+        const MAX_SPEED = 35.0;
+        const MIN_SPEED = 5.0;
+        const ACCEL_FACTOR = 1.5;         // 倾斜加速敏感度
+        const TURN_SENSITIVITY = 0.8;      // 转向敏感度
+        const PITCH_SENSITIVITY = 0.6;      // 俯仰敏感度
+        
+        // 世界边界
+        const WORLD_BOUNDS = 45;
+        
+        // 赛道元素: 圆环和星星
+        let rings = [];
+        let stars = [];
+        let ringCount = 8;
+        let starCount = 15;
+        let collectedStars = 0;
+        let passedRings = 0;
+        let totalTarget = ringCount + starCount;
+        
+        // 游戏状态
+        let gameActive = true;
+        let winFlag = false;
+        let score = 0;
+        let currentSpeed = 15.0;
+        
+        // 飞行器状态
+        let aircraftPosition = new THREE.Vector3(0, 3, 0);
+        let aircraftVelocity = new THREE.Vector3(0, 0, 0);
+        let aircraftRotation = { roll: 0, pitch: 0, yaw: 0 };
+        
+        // 陀螺仪数据 (经过校准)
+        let gamma = 0;   // 左右倾斜 (-90~90)
+        let beta = 0;    // 前后倾斜 (-180~180)
+        let gammaOffset = 0;
+        let betaOffset = 0;
+        let hasGyro = false;
+        
+        // Three.js 全局变量
+        let scene, camera, renderer;
+        let aircraftGroup, aircraftModel;
+        let ringGroup, starGroup;
+        let ambientLight, dirLight, fillLight;
+        
+        // 辅助变量
+        let lastTimestamp = 0;
+        let clock = new THREE.Clock();
+        
+        // UI 元素
+        const scoreSpan = document.getElementById('scoreValue');
+        const targetSpan = document.getElementById('targetValue');
+        const speedSpan = document.getElementById('speedValue');
+        const messageDiv = document.getElementById('message');
+        
+        // 更新UI
+        function updateUI() {
+            scoreSpan.innerText = score;
+            targetSpan.innerText = `${passedRings + collectedStars}/${totalTarget}`;
+            speedSpan.innerText = Math.floor(currentSpeed);
+        }
+        
+        function showMessage(text, duration = 2000) {
+            messageDiv.innerText = text;
+            messageDiv.style.opacity = '1';
+            setTimeout(() => { messageDiv.style.opacity = '0'; }, duration);
+        }
+        
+        // 胜利处理
+        function winGame() {
+            if (winFlag) return;
+            winFlag = true;
+            gameActive = false;
+            showMessage("✨ 胜利！完美通关 ✨", 3000);
+        }
+        
+        // 重置游戏
+        function resetGame() {
+            gameActive = true;
+            winFlag = false;
+            score = 0;
+            collectedStars = 0;
+            passedRings = 0;
+            currentSpeed = 15.0;
+            aircraftPosition.set(0, 3, 0);
+            aircraftVelocity.set(0, 0, 0);
+            aircraftRotation = { roll: 0, pitch: 0, yaw: 0 };
+            updateUI();
+            
+            // 重置所有圆环和星星的可见状态
+            rings.forEach(ring => {
+                ring.visible = true;
+                ring.userData.passed = false;
+            });
+            stars.forEach(star => {
+                star.visible = true;
+                star.userData.collected = false;
+            });
+            
+            showMessage("游戏已重置", 1000);
+        }
+        
+        // 创建飞行器模型 (简单的科幻风格)
+        function createAircraft() {
+            const group = new THREE.Group();
+            
+            // 机身 (锥体)
+            const bodyGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.2, 8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3a86ff, metalness: 0.7, roughness: 0.2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.rotation.x = Math.PI / 2;
+            body.castShadow = true;
+            group.add(body);
+            
+            // 机翼
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, metalness: 0.6 });
+            const wingGeo = new THREE.BoxGeometry(1.2, 0.08, 0.4);
+            const wings = new THREE.Mesh(wingGeo, wingMat);
+            wings.position.set(0, 0, 0);
+            group.add(wings);
+            
+            // 尾翼
+            const tailMat = new THREE.MeshStandardMaterial({ color: 0xffaa44 });
+            const tail = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.5, 4), tailMat);
+            tail.position.set(0, 0.2, -0.5);
+            group.add(tail);
+            
+            // 驾驶舱
+            const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), new THREE.MeshStandardMaterial({ color: 0x88ccff, emissive: 0x2266aa }));
+            cockpit.position.set(0, 0.2, 0.4);
+            group.add(cockpit);
+            
+            // 引擎光效
+            const engineGlow = new THREE.PointLight(0xff6600, 0.8, 6);
+            engineGlow.position.set(0, -0.1, -0.6);
+            group.add(engineGlow);
+            
+            group.castShadow = true;
+            return group;
+        }
+        
+        // 创建圆环 (Torii)
+        function createRing(x, z, yOffset = 2.5) {
+            const geometry = new THREE.TorusGeometry(0.9, 0.08, 32, 64);
+            const material = new THREE.MeshStandardMaterial({ color: 0xffaa88, emissive: 0x442200, metalness: 0.7 });
+            const ring = new THREE.Mesh(geometry, material);
+            ring.position.set(x, yOffset, z);
+            ring.rotation.x = Math.PI / 2;
+            ring.userData = { passed: false, radius: 0.9 };
+            return ring;
+        }
+        
+        // 创建星星 (八角星或简单八面体)
+        function createStar(x, z, yOffset = 2.0) {
+            const geometry = new THREE.OctahedronGeometry(0.35);
+            const material = new THREE.MeshStandardMaterial({ color: 0xffdd77, emissive: 0xaa6622 });
+            const star = new THREE.Mesh(geometry, material);
+            star.position.set(x, yOffset, z);
+            star.userData = { collected: false, radius: 0.4 };
+            return star;
+        }
+        
+        // 构建赛道: 螺旋上升 + 弯曲路径
+        function buildTrack() {
+            ringGroup = new THREE.Group();
+            starGroup = new THREE.Group();
+            
+            // 生成圆环: 沿曲线路径排列
+            const ringPositions = [
+                [0, 2.5, -8], [4, 3, -5], [7, 3.5, -1], [6, 4, 3], [3, 4.5, 7],
+                [-2, 5, 10], [-6, 5.5, 8], [-9, 5, 4], [-7, 4.5, 0], [-3, 4, -3],
+                [1, 3.5, -6], [5, 3, -8], [3, 4, -4], [-1, 4.5, 0], [-5, 5, 5]
+            ];
+            // 取前 ringCount 个
+            for (let i = 0; i < ringCount && i < ringPositions.length; i++) {
+                const pos = ringPositions[i];
+                const ring = createRing(pos[0], pos[2], pos[1]);
+                scene.add(ring);
+                rings.push(ring);
+            }
+            
+            // 生成星星: 随机分布在路径周围
+            for (let i = 0; i < starCount; i++) {
+                let x, z, y;
+                // 随机在赛道区域
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 6 + Math.random() * 12;
+                x = Math.cos(angle) * radius;
+                z = Math.sin(angle) * radius;
+                y = 2 + Math.random() * 4;
+                // 避免与圆环重叠
+                let valid = true;
+                for (let ring of rings) {
+                    if (Math.hypot(ring.position.x - x, ring.position.z - z) < 1.2) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (!valid) continue;
+                const star = createStar(x, z, y);
+                scene.add(star);
+                stars.push(star);
+            }
+            // 确保至少有星星
+            if (stars.length < 8) {
+                for (let i = 0; i < 8; i++) {
+                    const x = (Math.random() - 0.5) * 20;
+                    const z = (Math.random() - 0.5) * 20;
+                    const star = createStar(x, z, 2 + Math.random() * 3);
+                    scene.add(star);
+                    stars.push(star);
+                }
+            }
+            
+            // 更新目标显示
+            totalTarget = rings.length + stars.length;
+            targetSpan.innerText = `0/${totalTarget}`;
+        }
+        
+        // 初始化场景
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a1030);
+            scene.fog = new THREE.FogExp2(0x0a1030, 0.008);
+            
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            // 光照
+            ambientLight = new THREE.AmbientLight(0x404060);
+            scene.add(ambientLight);
+            dirLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
+            dirLight.position.set(5, 12, 3);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+            fillLight = new THREE.PointLight(0x88aaff, 0.5);
+            fillLight.position.set(-2, 4, 2);
+            scene.add(fillLight);
+            
+            // 辅助网格 (地面参考)
+            const grid = new THREE.GridHelper(80, 30, 0x88aaff, 0x335588);
+            grid.position.y = -1;
+            scene.add(grid);
+            
+            // 地面云层装饰
+            const cloudMat = new THREE.MeshStandardMaterial({ color: 0x88aacc, transparent: true, opacity: 0.2 });
+            const cloudPlane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), cloudMat);
+            cloudPlane.rotation.x = -Math.PI / 2;
+            cloudPlane.position.y = -0.5;
+            scene.add(cloudPlane);
+            
+            // 飞行器
+            aircraftGroup = createAircraft();
+            scene.add(aircraftGroup);
+            aircraftGroup.position.copy(aircraftPosition);
+            
+            // 赛道元素
+            buildTrack();
+        }
+        
+        // 陀螺仪处理 (带校准)
+        function initGyro() {
+            // 请求权限 (iOS)
+            const requestGyro = () => {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(() => {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            hasGyro = true;
+                            showMessage("陀螺仪已授权", 1000);
+                        })
+                        .catch(err => showMessage("授权失败", 1000));
+                } else {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    hasGyro = true;
+                }
+            };
+            
+            // 校准按钮
+            document.getElementById('calibrateBtn').addEventListener('click', () => {
+                if (!hasGyro) {
+                    requestGyro();
+                } else {
+                    gammaOffset = gamma;
+                    betaOffset = beta;
+                    showMessage("校准完成", 800);
+                }
+            });
+            
+            // 如果没有权限且需要请求，显示提示
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const btn = document.createElement('button');
+                btn.innerText = "🎙️ 授权陀螺仪";
+                btn.style.position = 'absolute';
+                btn.style.bottom = '80px';
+                btn.style.left = '50%';
+                btn.style.transform = 'translateX(-50%)';
+                btn.style.zIndex = '30';
+                btn.style.background = '#ffaa44';
+                btn.style.padding = '10px 20px';
+                btn.style.borderRadius = '40px';
+                btn.style.border = 'none';
+                btn.style.fontWeight = 'bold';
+                document.body.appendChild(btn);
+                btn.onclick = () => {
+                    requestGyro();
+                    btn.remove();
+                };
+                showMessage("点击授权按钮启用陀螺仪", 2000);
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                hasGyro = true;
+            }
+        }
+        
+        // 陀螺仪数据回调
+        let rawGamma = 0, rawBeta = 0;
+        function handleOrientation(event) {
+            rawGamma = event.gamma || 0;   // 左右
+            rawBeta = event.beta || 0;     // 前后
+            // 应用校准偏移
+            gamma = rawGamma - gammaOffset;
+            beta = rawBeta - betaOffset;
+            // 限制范围
+            gamma = Math.min(45, Math.max(-45, gamma));
+            beta = Math.min(45, Math.max(-45, beta));
+        }
+        
+        // 更新飞行器运动 (基于陀螺仪)
+        function updateMovement(deltaTime) {
+            if (!gameActive || winFlag) return;
+            if (!hasGyro) return;
+            
+            // 1. 油门控制: 前倾(beta负值)加速，后仰(beta正值)减速
+            // beta范围 -45~45，映射到 -1~1
+            let throttle = -beta / 45.0;   // 前倾为负beta -> 正throttle
+            throttle = Math.min(1.0, Math.max(-1.0, throttle));
+            // 加速度变化
+            let accel = throttle * ACCEL_FACTOR * 5.0 * deltaTime;
+            currentSpeed += accel;
+            currentSpeed = Math.min(MAX_SPEED, Math.max(MIN_SPEED, currentSpeed));
+            
+            // 2. 转向: gamma 控制滚转，并影响偏航 (左右转弯)
+            let rollAngle = gamma * TURN_SENSITIVITY * 0.8;
+            // 偏航角变化率与滚转成正比
+            let yawRate = gamma * 0.025 * deltaTime * (currentSpeed / 15.0);
+            aircraftRotation.yaw += yawRate;
+            
+            // 俯仰控制: 前后倾斜影响俯仰角 (让飞行器抬头/低头)
+            let pitchAngle = beta * PITCH_SENSITIVITY * 0.015;
+            aircraftRotation.pitch += (pitchAngle - aircraftRotation.pitch) * 0.1;
+            aircraftRotation.roll += (rollAngle - aircraftRotation.roll) * 0.1;
+            
+            // 限制角度
+            aircraftRotation.roll = Math.min(0.8, Math.max(-0.8, aircraftRotation.roll));
+            aircraftRotation.pitch = Math.min(0.5, Math.max(-0.5, aircraftRotation.pitch));
+            
+            // 3. 根据朝向计算前进方向
+            const forward = new THREE.Vector3(0, 0, -1);
+            const quat = new THREE.Quaternion().setFromEuler(
+                aircraftRotation.pitch, 
+                aircraftRotation.yaw, 
+                aircraftRotation.roll, 
+                'YXZ'
+            );
+            const direction = forward.applyQuaternion(quat);
+            
+            // 移动速度
+            const speedDelta = currentSpeed * deltaTime;
+            aircraftVelocity.copy(direction.multiplyScalar(speedDelta));
+            aircraftPosition.add(aircraftVelocity);
+            
+            // 边界限制 (X,Z 范围)
+            aircraftPosition.x = Math.min(WORLD_BOUNDS, Math.max(-WORLD_BOUNDS, aircraftPosition.x));
+            aircraftPosition.z = Math.min(WORLD_BOUNDS, Math.max(-WORLD_BOUNDS, aircraftPosition.z));
+            // 高度限制
+            aircraftPosition.y = Math.min(8, Math.max(1.5, aircraftPosition.y));
+            
+            // 更新飞行器模型位置和旋转
+            aircraftGroup.position.copy(aircraftPosition);
+            aircraftGroup.rotation.order = 'YXZ';
+            aircraftGroup.rotation.x = aircraftRotation.pitch;
+            aircraftGroup.rotation.y = aircraftRotation.yaw;
+            aircraftGroup.rotation.z = aircraftRotation.roll;
+        }
+        
+        // 碰撞检测与收集
+        function checkCollisions() {
+            if (!gameActive || winFlag) return;
+            const pos = aircraftPosition;
+            // 圆环碰撞
+            for (let ring of rings) {
+                if (ring.visible && !ring.userData.passed) {
+                    const dx = pos.x - ring.position.x;
+                    const dz = pos.z - ring.position.z;
+                    const dy = pos.y - ring.position.y;
+                    const dist = Math.hypot(dx, dy, dz);
+                    if (dist < 1.0) {
+                        ring.visible = false;
+                        ring.userData.passed = true;
+                        passedRings++;
+                        score += 10;
+                        updateUI();
+                        // 特效: 短暂闪光
+                        const flash = new THREE.PointLight(0xffaa66, 1, 5);
+                        flash.position.copy(ring.position);
+                        scene.add(flash);
+                        setTimeout(() => scene.remove(flash), 200);
+                        // 振动
+                        if (navigator.vibrate) navigator.vibrate(50);
+                        if (passedRings + collectedStars >= totalTarget) winGame();
+                    }
+                }
+            }
+            // 星星碰撞
+            for (let star of stars) {
+                if (star.visible && !star.userData.collected) {
+                    const dx = pos.x - star.position.x;
+                    const dz = pos.z - star.position.z;
+                    const dy = pos.y - star.position.y;
+                    const dist = Math.hypot(dx, dy, dz);
+                    if (dist < 0.65) {
+                        star.visible = false;
+                        star.userData.collected = true;
+                        collectedStars++;
+                        score += 5;
+                        updateUI();
+                        const flash = new THREE.PointLight(0xffdd88, 0.8, 4);
+                        flash.position.copy(star.position);
+                        scene.add(flash);
+                        setTimeout(() => scene.remove(flash), 150);
+                        if (navigator.vibrate) navigator.vibrate(30);
+                        if (passedRings + collectedStars >= totalTarget) winGame();
+                    }
+                }
+            }
+        }
+        
+        // 相机跟随 (第三人称)
+        function updateCamera() {
+            const targetPos = aircraftPosition.clone();
+            const offset = new THREE.Vector3(-3, 2.5, 4);
+            // 根据飞行器朝向偏移
+            const quat = aircraftGroup.quaternion;
+            const rotatedOffset = offset.clone().applyQuaternion(quat);
+            const desired = targetPos.clone().add(rotatedOffset);
+            camera.position.lerp(desired, 0.08);
+            camera.lookAt(targetPos);
+        }
+        
+        // 动画循环
+        let lastTime = performance.now();
+        function animate() {
+            const now = performance.now();
+            let delta = Math.min(0.033, (now - lastTime) / 1000);
+            lastTime = now;
+            
+            if (delta > 0.01) {
+                updateMovement(delta);
+                checkCollisions();
+                updateCamera();
+            }
+            
+            // 让星星轻微旋转
+            stars.forEach(star => {
+                if (star.visible) {
+                    star.rotation.y += 0.02;
+                    star.rotation.x += 0.01;
+                }
+            });
+            rings.forEach(ring => {
+                if (ring.visible) {
+                    ring.rotation.z += 0.01;
+                }
+            });
+            
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        
+        // 重置按钮
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            resetGame();
+        });
+        
+        // 启动
+        function start() {
+            initScene();
+            initGyro();
+            animate();
+            updateUI();
+        }
+        
+        start();
+    </script>
+</body>
+</html>
